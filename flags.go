@@ -9,12 +9,15 @@ var (
 	queues        queuesFlag
 	intervalFloat float64
 	interval      intervalFlag
+	concurrency   int
 )
 
 func init() {
 	flag.StringVar(&queuesString, "queues", "", "a comma-separated list of redis queues")
 
 	flag.Float64Var(&intervalFloat, "interval", 5.0, "sleep interval when no jobs are found")
+
+	flag.IntVar(&concurrency, "concurrency", 25, "the maximum number of concurrently executing jobs")
 }
 
 func flags() error {
