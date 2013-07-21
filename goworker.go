@@ -18,5 +18,9 @@ func Work() error {
 		return err
 	}
 
+	quit := signals()
+
+	<-quit
+
 	return nil
 }
