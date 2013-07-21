@@ -1,16 +1,36 @@
 package goworker
 
 import (
+	"code.google.com/p/vitess/go/pools"
 	"errors"
 	"github.com/garyburd/redigo/redis"
 	"net/url"
+	"time"
 )
 
 var (
 	errorInvalidScheme = errors.New("Invalid Redis database URI scheme.")
 )
 
-func redisConnFromUri(uriString string) (*redis.Conn, error) {
+type redisConn struct {
+	redis.Conn
+}
+
+func (r *redisConn) Close() {
+	_ = r.Conn.Close()
+}
+
+func newRedisFactory(uri string) pools.Factory {
+	return func() (pools.Resource, error) {
+		return redisConnFromUri(uri)
+	}
+}
+
+func newRedisPool(uri string, capacity int, maxCapacity int, idleTimout time.Duration) *pools.ResourcePool {
+	return pools.NewResourcePool(newRedisFactory(uri), capacity, maxCapacity, idleTimout)
+}
+
+func redisConnFromUri(uriString string) (*redisConn, error) {
 	uri, err := url.Parse(uriString)
 	if err != nil {
 		return nil, err
@@ -59,5 +79,5 @@ func redisConnFromUri(uriString string) (*redis.Conn, error) {
 		}
 	}
 
-	return &conn, nil
+	return &redisConn{Conn: conn}, nil
 }

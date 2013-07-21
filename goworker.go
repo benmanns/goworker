@@ -3,6 +3,7 @@ package goworker
 import (
 	"github.com/cihub/seelog"
 	"os"
+	"time"
 )
 
 var logger seelog.LoggerInterface
@@ -19,6 +20,9 @@ func Work() error {
 	}
 
 	quit := signals()
+
+	pool := newRedisPool(uri, connections, connections, time.Minute)
+	defer pool.Close()
 
 	<-quit
 
