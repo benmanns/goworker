@@ -2,6 +2,7 @@ package goworker
 
 import (
 	"flag"
+	"os"
 )
 
 var (
@@ -11,6 +12,7 @@ var (
 	interval      intervalFlag
 	concurrency   int
 	connections   int
+	uri           string
 )
 
 func init() {
@@ -21,6 +23,18 @@ func init() {
 	flag.IntVar(&concurrency, "concurrency", 25, "the maximum number of concurrently executing jobs")
 
 	flag.IntVar(&connections, "connections", 25+1, "the maximum number of connections to the Redis database")
+
+	redisProvider := os.Getenv("REDIS_PROVIDER")
+	var redisEnvUri string
+	if redisProvider != "" {
+		redisEnvUri = os.Getenv(redisProvider)
+	} else {
+		redisEnvUri = os.Getenv("REDIS_URL")
+	}
+	if redisEnvUri == "" {
+		redisEnvUri = "redis://localhost:6379/"
+	}
+	flag.StringVar(&uri, "uri", redisEnvUri, "the URI of the redis server")
 }
 
 func flags() error {
