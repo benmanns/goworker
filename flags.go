@@ -10,6 +10,7 @@ var (
 	intervalFloat float64
 	interval      intervalFlag
 	concurrency   int
+	connections   int
 )
 
 func init() {
@@ -18,6 +19,8 @@ func init() {
 	flag.Float64Var(&intervalFloat, "interval", 5.0, "sleep interval when no jobs are found")
 
 	flag.IntVar(&concurrency, "concurrency", 25, "the maximum number of concurrently executing jobs")
+
+	flag.IntVar(&connections, "connections", 25+1, "the maximum number of connections to the Redis database")
 }
 
 func flags() error {
