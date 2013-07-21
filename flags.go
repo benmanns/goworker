@@ -6,13 +6,14 @@ import (
 )
 
 var (
-	queuesString  string
-	queues        queuesFlag
-	intervalFloat float64
-	interval      intervalFlag
-	concurrency   int
-	connections   int
-	uri           string
+	queuesString   string
+	queues         queuesFlag
+	intervalFloat  float64
+	interval       intervalFlag
+	concurrency    int
+	connections    int
+	uri            string
+	exitOnComplete bool
 )
 
 func init() {
@@ -35,6 +36,8 @@ func init() {
 		redisEnvUri = "redis://localhost:6379/"
 	}
 	flag.StringVar(&uri, "uri", redisEnvUri, "the URI of the redis server")
+
+	flag.BoolVar(&exitOnComplete, "exit-on-complete", false, "exit when the queue is empty")
 }
 
 func flags() error {
