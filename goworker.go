@@ -14,5 +14,9 @@ func Work() error {
 		return err
 	}
 
+	if err := flags(); err != nil {
+		return err
+	}
+
 	return nil
 }
