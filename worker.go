@@ -1,5 +1,9 @@
 package goworker
 
+import (
+	"encoding/json"
+)
+
 type worker struct {
 	process
 }
@@ -12,4 +16,8 @@ func newWorker(id string, queues []string) (*worker, error) {
 	return &worker{
 		process: *process,
 	}, nil
+}
+
+func (w *worker) MarshalJSON() ([]byte, error) {
+	return json.Marshal(w.String())
 }
