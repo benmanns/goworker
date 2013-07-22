@@ -24,6 +24,11 @@ func Work() error {
 	pool := newRedisPool(uri, connections, connections, time.Minute)
 	defer pool.Close()
 
+	_, err = newPoller(queues)
+	if err != nil {
+		return err
+	}
+
 	<-quit
 
 	return nil
