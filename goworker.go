@@ -3,6 +3,8 @@ package goworker
 import (
 	"github.com/cihub/seelog"
 	"os"
+	"strconv"
+	"sync"
 	"time"
 )
 
@@ -28,9 +30,19 @@ func Work() error {
 	if err != nil {
 		return err
 	}
-	_ = poller.poll(pool, time.Duration(interval), quit)
+	jobs := poller.poll(pool, time.Duration(interval), quit)
 
-	<-quit
+	var monitor sync.WaitGroup
+
+	for id := 0; id < concurrency; id++ {
+		worker, err := newWorker(strconv.Itoa(id), queues)
+		if err != nil {
+			return err
+		}
+		worker.work(pool, jobs, &monitor)
+	}
+
+	monitor.Wait()
 
 	return nil
 }
