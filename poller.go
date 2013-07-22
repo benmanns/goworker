@@ -1,8 +1,10 @@
 package goworker
 
 import (
+	"code.google.com/p/vitess/go/pools"
 	"encoding/json"
 	"fmt"
+	"time"
 )
 
 type poller struct {
@@ -40,4 +42,77 @@ func (p *poller) getJob(conn *redisConn) (*job, error) {
 	}
 
 	return nil, nil
+}
+
+func (p *poller) poll(pool *pools.ResourcePool, interval time.Duration, quit <-chan bool) <-chan *job {
+	jobs := make(chan *job)
+
+	resource, err := pool.Get()
+	if err != nil {
+		logger.Criticalf("Error on getting connection in poller %s", p)
+	} else {
+		conn := resource.(*redisConn)
+		p.open(conn)
+		p.start(conn)
+		pool.Put(conn)
+	}
+
+	go func() {
+		defer func() {
+			close(jobs)
+
+			resource, err := pool.Get()
+			if err != nil {
+				logger.Criticalf("Error on getting connection in poller %s", p)
+			} else {
+				conn := resource.(*redisConn)
+				p.finish(conn)
+				p.close(conn)
+				pool.Put(conn)
+			}
+		}()
+
+		for {
+			select {
+			case <-quit:
+				return
+			default:
+				resource, err := pool.Get()
+				if err != nil {
+					logger.Criticalf("Error on getting connection in poller %s", p)
+					return
+				} else {
+					conn := resource.(*redisConn)
+
+					job, err := p.getJob(conn)
+					if err != nil {
+						logger.Errorf("Error on %v getting job from %v: %v", p, p.Queues, err)
+					}
+					if job != nil {
+						conn.Send("INCR", fmt.Sprintf("resque:stat:processed:%v", p))
+						conn.Flush()
+						pool.Put(conn)
+						jobs <- job
+					} else {
+						pool.Put(conn)
+						if exitOnComplete {
+							return
+						} else {
+							logger.Debugf("Sleeping for %v", interval)
+							logger.Debugf("Waiting for %v", p.Queues)
+
+							timeout := time.After(interval)
+							select {
+							case <-quit:
+								return
+							case <-timeout:
+							}
+						}
+					}
+				}
+			}
+		}
+	}()
+
+	return jobs
 }
