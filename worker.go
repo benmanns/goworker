@@ -1,7 +1,9 @@
 package goworker
 
 import (
+	"code.google.com/p/vitess/go/pools"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 )
@@ -74,4 +76,33 @@ func (w *worker) finish(conn *redisConn, job *job, err error) error {
 		w.succeed(conn, job)
 	}
 	return w.process.finish(conn)
+}
+
+func (w *worker) run(pool *pools.ResourcePool, job *job, workerFunc WorkerFunc) {
+	var err error
+	defer func() {
+		resource, err := pool.Get()
+		if err != nil {
+			logger.Criticalf("Error on getting connection in worker %v", w)
+		} else {
+			conn := resource.(*redisConn)
+			w.finish(conn, job, err)
+			pool.Put(conn)
+		}
+	}()
+	defer func() {
+		if r := recover(); r != nil {
+			err = errors.New(fmt.Sprint(r))
+		}
+	}()
+
+	resource, err := pool.Get()
+	if err != nil {
+		logger.Criticalf("Error on getting connection in worker %v", w)
+	} else {
+		conn := resource.(*redisConn)
+		w.start(conn, job)
+		pool.Put(conn)
+	}
+	err = workerFunc(job.Queue, job.Payload.Args...)
 }
