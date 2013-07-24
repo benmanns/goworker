@@ -10,6 +10,11 @@ import (
 
 var logger seelog.LoggerInterface
 
+// Call this function to run goworker. Check for errors in
+// the return value. Work will take over the Go executable
+// and will run until a QUIT, INT, or TERM signal is
+// received, or until the queues are empty if the
+// -exit-on-complete flag is set.
 func Work() error {
 	var err error
 	logger, err = seelog.LoggerFromWriterWithMinLevel(os.Stdout, seelog.InfoLvl)
