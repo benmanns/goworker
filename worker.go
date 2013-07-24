@@ -118,7 +118,7 @@ func (w *worker) work(pool *pools.ResourcePool, jobs <-chan *job, monitor *sync.
 	}()
 }
 
-func (w *worker) run(pool *pools.ResourcePool, job *job, workerFunc WorkerFunc) {
+func (w *worker) run(pool *pools.ResourcePool, job *job, workerFunc workerFunc) {
 	var err error
 	defer func() {
 		resource, poolErr := pool.Get()
