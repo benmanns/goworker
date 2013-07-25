@@ -35,7 +35,7 @@ func init() {
 	if redisEnvUri == "" {
 		redisEnvUri = "redis://localhost:6379/"
 	}
-	flag.StringVar(&uri, "uri", redisEnvUri, "the URI of the redis server")
+	flag.StringVar(&uri, "uri", redisEnvUri, "the URI of the Redis server")
 
 	flag.BoolVar(&exitOnComplete, "exit-on-complete", false, "exit when the queue is empty")
 }
