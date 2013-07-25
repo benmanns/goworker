@@ -23,7 +23,7 @@ func init() {
 
 	flag.IntVar(&concurrency, "concurrency", 25, "the maximum number of concurrently executing jobs")
 
-	flag.IntVar(&connections, "connections", 25+1, "the maximum number of connections to the Redis database")
+	flag.IntVar(&connections, "connections", 2, "the maximum number of connections to the Redis database")
 
 	redisProvider := os.Getenv("REDIS_PROVIDER")
 	var redisEnvUri string
