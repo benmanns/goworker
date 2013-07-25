@@ -17,7 +17,7 @@ var (
 )
 
 func init() {
-	flag.StringVar(&queuesString, "queues", "", "a comma-separated list of redis queues")
+	flag.StringVar(&queuesString, "queues", "", "a comma-separated list of Resque queues")
 
 	flag.Float64Var(&intervalFloat, "interval", 5.0, "sleep interval when no jobs are found")
 
