@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
 	"sync"
 	"time"
 )
@@ -111,8 +110,17 @@ func (w *worker) work(pool *pools.ResourcePool, jobs <-chan *job, monitor *sync.
 
 				logger.Debugf("done: (Job{%s} | %s | %v)", job.Queue, job.Payload.Class, job.Payload.Args)
 			} else {
-				logger.Criticalf("No worker for %s in queue %s with args %v", job.Payload.Class, job.Queue, job.Payload.Args)
-				os.Exit(1)
+				errorLog := fmt.Sprintf("No worker for %s in queue %s with args %v", job.Payload.Class, job.Queue, job.Payload.Args)
+				logger.Critical(errorLog)
+
+				resource, err := pool.Get()
+				if err != nil {
+					logger.Criticalf("Error on getting connection in worker %v", w)
+				} else {
+					conn := resource.(*redisConn)
+					w.finish(conn, job, errors.New(errorLog))
+					pool.Put(conn)
+				}
 			}
 		}
 	}()
