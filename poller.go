@@ -92,7 +92,24 @@ func (p *poller) poll(pool *pools.ResourcePool, interval time.Duration, quit <-c
 						conn.Send("INCR", fmt.Sprintf("resque:stat:processed:%v", p))
 						conn.Flush()
 						pool.Put(conn)
-						jobs <- job
+						select {
+						case jobs <- job:
+						case <-quit:
+							buf, err := json.Marshal(job.Payload)
+							if err != nil {
+								logger.Criticalf("Error requeueing %v: %v", job, err)
+								return
+							}
+							resource, err := pool.Get()
+							if err != nil {
+								logger.Criticalf("Error on getting connection in poller %s", p)
+							}
+
+							conn := resource.(*redisConn)
+							conn.Send("LPUSH", fmt.Sprintf("resque:queue:%s", job.Queue), buf)
+							conn.Flush()
+							return
+						}
 					} else {
 						pool.Put(conn)
 						if exitOnComplete {
