@@ -25,7 +25,7 @@ func (p *poller) getJob(conn *redisConn) (*job, error) {
 	for _, queue := range p.Queues {
 		logger.Debugf("Checking %s", queue)
 
-		reply, err := conn.Do("LPOP", fmt.Sprintf("resque:queue:%s", queue))
+		reply, err := conn.Do("LPOP", fmt.Sprintf("%squeue:%s", namespace, queue))
 		if err != nil {
 			return nil, err
 		}
@@ -89,7 +89,7 @@ func (p *poller) poll(pool *pools.ResourcePool, interval time.Duration, quit <-c
 						logger.Errorf("Error on %v getting job from %v: %v", p, p.Queues, err)
 					}
 					if job != nil {
-						conn.Send("INCR", fmt.Sprintf("resque:stat:processed:%v", p))
+						conn.Send("INCR", fmt.Sprintf("%sstat:processed:%v", namespace, p))
 						conn.Flush()
 						pool.Put(conn)
 						select {
@@ -106,7 +106,7 @@ func (p *poller) poll(pool *pools.ResourcePool, interval time.Duration, quit <-c
 							}
 
 							conn := resource.(*redisConn)
-							conn.Send("LPUSH", fmt.Sprintf("resque:queue:%s", job.Queue), buf)
+							conn.Send("LPUSH", fmt.Sprintf("%squeue:%s", namespace, job.Queue), buf)
 							conn.Flush()
 							return
 						}

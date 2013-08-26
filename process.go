@@ -33,9 +33,9 @@ func (p *process) String() string {
 }
 
 func (p *process) open(conn *redisConn) error {
-	conn.Send("SADD", "resque:workers", p)
-	conn.Send("SET", fmt.Sprintf("resque:stat:processed:%v", p), "0")
-	conn.Send("SET", fmt.Sprintf("resque:stat:failed:%v", p), "0")
+	conn.Send("SADD", fmt.Sprintf("%sworkers", namespace), p)
+	conn.Send("SET", fmt.Sprintf("%sstat:processed:%v", namespace, p), "0")
+	conn.Send("SET", fmt.Sprintf("%sstat:failed:%v", namespace, p), "0")
 	conn.Flush()
 
 	return nil
@@ -43,32 +43,32 @@ func (p *process) open(conn *redisConn) error {
 
 func (p *process) close(conn *redisConn) error {
 	logger.Infof("%v shutdown", p)
-	conn.Send("SREM", "resque:workers", p)
-	conn.Send("DEL", fmt.Sprintf("resque:stat:processed:%s", p))
-	conn.Send("DEL", fmt.Sprintf("resque:stat:failed:%s", p))
+	conn.Send("SREM", fmt.Sprintf("%sworkers", namespace), p)
+	conn.Send("DEL", fmt.Sprintf("%sstat:processed:%s", namespace, p))
+	conn.Send("DEL", fmt.Sprintf("%sstat:failed:%s", namespace, p))
 	conn.Flush()
 
 	return nil
 }
 
 func (p *process) start(conn *redisConn) error {
-	conn.Send("SET", fmt.Sprintf("resque:worker:%s:started", p), time.Now().String())
+	conn.Send("SET", fmt.Sprintf("%sworker:%s:started", namespace, p), time.Now().String())
 	conn.Flush()
 
 	return nil
 }
 
 func (p *process) finish(conn *redisConn) error {
-	conn.Send("DEL", fmt.Sprintf("resque:worker:%s", p))
-	conn.Send("DEL", fmt.Sprintf("resque:worker:%s:started", p))
+	conn.Send("DEL", fmt.Sprintf("%sworker:%s", namespace, p))
+	conn.Send("DEL", fmt.Sprintf("%sworker:%s:started", namespace, p))
 	conn.Flush()
 
 	return nil
 }
 
 func (p *process) fail(conn *redisConn) error {
-	conn.Send("INCR", "resque:stat:failed")
-	conn.Send("INCR", fmt.Sprintf("resque:stat:failed:%s", p))
+	conn.Send("INCR", fmt.Sprintf("%sstat:failed", namespace))
+	conn.Send("INCR", fmt.Sprintf("%sstat:failed:%s", namespace, p))
 	conn.Flush()
 
 	return nil

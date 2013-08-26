@@ -39,7 +39,7 @@ func (w *worker) start(conn *redisConn, job *job) error {
 		return err
 	}
 
-	conn.Send("SET", fmt.Sprintf("resque:worker:%s", w), buffer)
+	conn.Send("SET", fmt.Sprintf("%sworker:%s", namespace, w), buffer)
 	logger.Debugf("Processing %s since %s [%v]", work.Queue, work.RunAt, work.Payload.Class)
 
 	return w.process.start(conn)
@@ -58,14 +58,14 @@ func (w *worker) fail(conn *redisConn, job *job, err error) error {
 	if err != nil {
 		return err
 	}
-	conn.Send("RPUSH", "resque:failed", buffer)
+	conn.Send("RPUSH", fmt.Sprintf("%sfailed", namespace), buffer)
 
 	return w.process.fail(conn)
 }
 
 func (w *worker) succeed(conn *redisConn, job *job) error {
-	conn.Send("INCR", "resque:stat:processed")
-	conn.Send("INCR", fmt.Sprintf("resque:stat:processed:%s", w))
+	conn.Send("INCR", fmt.Sprintf("%sstat:processed", namespace))
+	conn.Send("INCR", fmt.Sprintf("%sstat:processed:%s", namespace, w))
 
 	return nil
 }

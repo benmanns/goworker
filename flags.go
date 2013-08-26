@@ -54,6 +54,10 @@
 // let the Redis To Go add-on configure the Redis
 // database.
 //
+// -namespace=resque:
+// — Specifies the namespace from which goworker
+// retrieves jobs and stores stats on workers.
+//
 // -exit-on-complete=false
 // — Exits goworker when there are no jobs left
 // in the queue. This is helpful in conjunction
@@ -81,6 +85,7 @@ var (
 	concurrency    int
 	connections    int
 	uri            string
+	namespace      string
 	exitOnComplete bool
 )
 
@@ -104,6 +109,8 @@ func init() {
 		redisEnvUri = "redis://localhost:6379/"
 	}
 	flag.StringVar(&uri, "uri", redisEnvUri, "the URI of the Redis server")
+
+	flag.StringVar(&namespace, "namespace", "resque:", "the Redis namespace")
 
 	flag.BoolVar(&exitOnComplete, "exit-on-complete", false, "exit when the queue is empty")
 }
