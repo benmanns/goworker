@@ -76,7 +76,7 @@ func newMyFunc(uri string) {
 }
 
 func init() {
-	goworker.Register("MyClass", myFunc)
+	goworker.Register("MyClass", newMyFunc())
 }
 
 func main() {
