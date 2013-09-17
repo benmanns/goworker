@@ -52,7 +52,7 @@ func signals() <-chan bool {
 		defer close(signals)
 
 		signal.Notify(signals, syscall.SIGQUIT, syscall.SIGTERM, os.Interrupt)
-		defer signal.Stop(signals)
+		defer signalStop(signals)
 
 		<-signals
 		quit <- true
