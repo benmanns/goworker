@@ -4,6 +4,7 @@ import (
 	"code.google.com/p/vitess/go/pools"
 	"encoding/json"
 	"fmt"
+	"math/rand"
 	"time"
 )
 
@@ -22,7 +23,8 @@ func newPoller(queues []string) (*poller, error) {
 }
 
 func (p *poller) getJob(conn *redisConn) (*job, error) {
-	for _, queue := range p.Queues {
+	for _, index := range rand.Perm(len(p.Queues)) {
+		queue := p.Queues[index]
 		logger.Debugf("Checking %s", queue)
 
 		reply, err := conn.Do("LPOP", fmt.Sprintf("%squeue:%s", namespace, queue))
