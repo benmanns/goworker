@@ -26,6 +26,21 @@ var queuesFlagSetTests = []struct {
 		queuesFlag([]string{"high", "low"}),
 		nil,
 	},
+	{
+		"high=2,low=1",
+		queuesFlag([]string{"high", "high", "low"}),
+		nil,
+	},
+	{
+		"high=2,low",
+		queuesFlag([]string{"high", "high", "low"}),
+		nil,
+	},
+	{
+		"low=1,high=2",
+		queuesFlag([]string{"low", "high", "high"}),
+		nil,
+	},
 }
 
 func TestQueuesFlagSet(t *testing.T) {
@@ -62,4 +77,57 @@ func TestQueuesFlagString(t *testing.T) {
 			t.Errorf("QueuesFlag(%#v): expected %s, actual %s", tt.q, tt.expected, actual)
 		}
 	}
+}
+
+func TestParseQueueAndWeight(t *testing.T) {
+	for _, tt := range parseQueueAndWeightTests {
+		queue, weight, err := parseQueueAndWeight(tt.queueAndWeight)
+		if queue != tt.queue {
+			t.Errorf("parseQueueAndWeight#queue expected %s, actual %s", tt.queue, queue)
+		}
+		if weight != tt.weight {
+			t.Errorf("parseQueueAndWeight#weight expected %d, actual %d", tt.weight, weight)
+		}
+		if err != tt.err {
+			t.Errorf("parseQueueAndWeight#err expected %v, actual %v", tt.err, err)
+		}
+	}
+}
+
+var parseQueueAndWeightTests = []struct {
+	queueAndWeight string
+	queue          string
+	weight         int
+	err            error
+}{
+	{
+		"q==",
+		"",
+		0,
+		errorNoneNumericWeight,
+	},
+	{
+		"q=a",
+		"",
+		0,
+		errorNoneNumericWeight,
+	},
+	{
+		"",
+		"",
+		1,
+		nil,
+	},
+	{
+		"q",
+		"q",
+		1,
+		nil,
+	},
+	{
+		"q=2",
+		"q",
+		2,
+		nil,
+	},
 }
