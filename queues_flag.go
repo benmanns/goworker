@@ -15,10 +15,6 @@ var (
 type queuesFlag []string
 
 func (q *queuesFlag) Set(value string) error {
-	if value == "" {
-		return errorEmptyQueues
-	}
-
 	// Parse the individual queues and their weights if they are present.
 	for _, queueAndWeight := range strings.Split(value, ",") {
 		if queueAndWeight == "" {
@@ -33,6 +29,9 @@ func (q *queuesFlag) Set(value string) error {
 		for i := 0; i < weight; i++ {
 			*q = append(*q, queue)
 		}
+	}
+	if len(*q) == 0 {
+		return errorEmptyQueues
 	}
 	return nil
 }
