@@ -8,8 +8,8 @@ import (
 )
 
 var (
-	errorEmptyQueues       = errors.New("You must specify at least one queue.")
-	errorNoneNumericWeight = errors.New("The weight must be a numeric value.")
+	errorEmptyQueues      = errors.New("You must specify at least one queue.")
+	errorNonNumericWeight = errors.New("The weight must be a numeric value.")
 )
 
 type queuesFlag []string
@@ -41,7 +41,7 @@ func parseQueueAndWeight(queueAndWeight string) (queue string, weight int, err e
 	parts := strings.Split(queueAndWeight, "=")
 	// There must be exactly one '=' in queue/weight declaration
 	if len(parts) > 2 {
-		return "", 0, errorNoneNumericWeight
+		return "", 0, errorNonNumericWeight
 	}
 
 	//The empty string is a valid queue name, and has the default weight of 1
@@ -62,7 +62,7 @@ func parseQueueAndWeight(queueAndWeight string) (queue string, weight int, err e
 		queue = parts[0]
 		weight, err = strconv.Atoi(parts[1])
 		if err != nil {
-			return "", 0, errorNoneNumericWeight
+			return "", 0, errorNonNumericWeight
 		}
 		return queue, weight, nil
 	}
