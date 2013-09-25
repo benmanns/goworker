@@ -19,7 +19,12 @@
 // cause the goworker process to fail the jobs.
 // Because of this, there is no default queue,
 // nor is there a way to select all queues (à la
-// Resque's * queue).
+// Resque's * queue). Queues are processed in
+// the order they are specififed.
+// If you have multiple queues you can assign
+// them weights. A queue with a weight of 2 will
+//  be checked twice as often as a queue with a
+// weight of 1: -queues='high=2,low=1'.
 //
 // -interval=5.0
 // — Specifies the wait period between polling if
@@ -75,6 +80,7 @@ package goworker
 import (
 	"flag"
 	"os"
+	"strings"
 )
 
 var (
@@ -87,6 +93,7 @@ var (
 	uri            string
 	namespace      string
 	exitOnComplete bool
+	isStrict       bool
 )
 
 func init() {
@@ -125,5 +132,6 @@ func flags() error {
 	if err := interval.SetFloat(intervalFloat); err != nil {
 		return err
 	}
+	isStrict = strings.IndexRune(queuesString, '=') == -1
 	return nil
 }

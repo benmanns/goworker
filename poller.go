@@ -9,20 +9,22 @@ import (
 
 type poller struct {
 	process
+	isStrict bool
 }
 
-func newPoller(queues []string) (*poller, error) {
+func newPoller(queues []string, isStrict bool) (*poller, error) {
 	process, err := newProcess("poller", queues)
 	if err != nil {
 		return nil, err
 	}
 	return &poller{
-		process: *process,
+		process:  *process,
+		isStrict: isStrict,
 	}, nil
 }
 
 func (p *poller) getJob(conn *redisConn) (*job, error) {
-	for _, queue := range p.Queues {
+	for _, queue := range p.queues(p.isStrict) {
 		logger.Debugf("Checking %s", queue)
 
 		reply, err := conn.Do("LPOP", fmt.Sprintf("%squeue:%s", namespace, queue))
