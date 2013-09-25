@@ -67,6 +67,11 @@ var queuesFlagSetTests = []struct {
 		nil,
 	},
 	{
+		",,,",
+		nil,
+		errors.New("You must specify at least one queue."),
+	},
+	{
 		"=1",
 		nil,
 		errors.New("You must specify at least one queue."),
