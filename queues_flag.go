@@ -44,6 +44,10 @@ func parseQueueAndWeight(queueAndWeight string) (queue string, weight int, err e
 	parts := strings.SplitN(queueAndWeight, "=", 2)
 	queue = parts[0]
 
+	if queue == "" {
+		return
+	}
+
 	// If '=' is not present then we only have the queue name and the default weight is 1.
 	if len(parts) == 1 {
 		weight = 1
