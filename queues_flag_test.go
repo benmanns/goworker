@@ -61,6 +61,16 @@ var queuesFlagSetTests = []struct {
 		nil,
 		errors.New("The weight must be a numeric value."),
 	},
+	{
+		"high=2,,,=1",
+		queuesFlag([]string{"high", "high"}),
+		nil,
+	},
+	{
+		"=1",
+		nil,
+		errors.New("You must specify at least one queue."),
+	},
 }
 
 func TestQueuesFlagSet(t *testing.T) {
