@@ -48,20 +48,13 @@ func parseQueueAndWeight(queueAndWeight string) (queue string, weight int, err e
 		return
 	}
 
-	// If '=' is not present then we only have the queue name and the default weight is 1.
 	if len(parts) == 1 {
 		weight = 1
-		err = nil
-		return
-	}
-
-	// Check to see if we have a weight for this queue.
-	if len(parts) == 2 {
+	} else {
 		weight, err = strconv.Atoi(parts[1])
 		if err != nil {
-			return "", 0, errorNonNumericWeight
+			err = errorNonNumericWeight
 		}
-		return queue, weight, nil
 	}
 	return
 }
