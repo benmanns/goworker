@@ -76,12 +76,12 @@ func (p *process) fail(conn *redisConn) error {
 }
 
 func (p *process) queues(strict bool) []string {
-	//If the queues order is strict then just return them
+	// If the queues order is strict then just return them.
 	if strict {
 		return p.Queues
 	}
 
-	//If not then we want to to shuffle the queues before returning them
+	// If not then we want to to shuffle the queues before returning them.
 	queues := make([]string, len(p.Queues))
 	for i, v := range rand.Perm(len(p.Queues)) {
 		queues[i] = p.Queues[v]
