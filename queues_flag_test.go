@@ -50,8 +50,10 @@ func TestQueuesFlagSet(t *testing.T) {
 		if fmt.Sprint(actual) != fmt.Sprint(tt.expected) {
 			t.Errorf("QueuesFlag: set to %s expected %v, actual %v", tt.v, tt.expected, actual)
 		}
-		if tt.err != nil && err.Error() != tt.err.Error() {
-			t.Errorf("QueuesFlag: set to %s expected err %v, actual err %v", tt.v, tt.expected, actual)
+		if (err != nil && tt.err == nil) ||
+			(err == nil && tt.err != nil) ||
+			(err != nil && tt.err != nil && err.Error() != tt.err.Error()) {
+			t.Errorf("QueuesFlag: set to %s expected err %v, actual err %v", tt.v, tt.err, err)
 		}
 	}
 }
