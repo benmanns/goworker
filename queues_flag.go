@@ -21,6 +21,10 @@ func (q *queuesFlag) Set(value string) error {
 
 	// Parse the individual queues and their weights if they are present.
 	for _, queueAndWeight := range strings.Split(value, ",") {
+		if queueAndWeight == "" {
+			continue
+		}
+
 		queue, weight, err := parseQueueAndWeight(queueAndWeight)
 		if err != nil {
 			return err
@@ -42,11 +46,6 @@ func parseQueueAndWeight(queueAndWeight string) (queue string, weight int, err e
 	// There must be exactly one '=' in queue/weight declaration.
 	if len(parts) > 2 {
 		return "", 0, errorNonNumericWeight
-	}
-
-	// The empty string is a valid queue name, and has the default weight of 1.
-	if len(parts) == 0 {
-		return "", 1, nil
 	}
 
 	// If '=' is not present then we only have the queue name and the default weight is 1.
