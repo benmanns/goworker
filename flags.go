@@ -24,7 +24,7 @@
 // If you have multiple queues you can assign
 // them weights. A queue with a weight of 2 will
 //  be checked twice as often as a queue with a
-// weight of 1: -queues='high=2,low=1'
+// weight of 1: -queues='high=2,low=1'.
 //
 // -interval=5.0
 // — Specifies the wait period between polling if
