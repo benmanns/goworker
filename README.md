@@ -92,7 +92,7 @@ goworker worker functions receive the queue they are serving and a slice of inte
 
 ```go
 // Expecting (int, string, float64)
-func myFunc(queue, args ...interface()) error {
+func myFunc(queue, args ...interface{}) error {
 	id, ok := args[0].(int)
 	if !ok {
 		return errorInvalidParam
