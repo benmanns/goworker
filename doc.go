@@ -74,7 +74,7 @@
 // to convert them into usable types.
 //
 //	// Expecting (int, string, float64)
-//	func myFunc(queue, args ...interface()) error {
+//	func myFunc(queue, args ...interface{}) error {
 //		id, ok := args[0].(int)
 //		if !ok {
 //			return errorInvalidParam
