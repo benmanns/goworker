@@ -15,3 +15,11 @@ func init() {
 func Register(class string, worker workerFunc) {
 	workers[class] = worker
 }
+
+func Workers() []string {
+	mk := make([]string, len(workers))
+	for k, _ := range workers {
+		mk = append(mk, k)
+	}
+	return mk
+}
