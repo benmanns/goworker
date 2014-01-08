@@ -24,7 +24,7 @@ func Enqueue(queue string, class string, args []interface{}) error {
 	if err != nil {
 		return err
 	}
-	err = conn.Send("RPUSH", fmt.Sprintf("resque:queue:%s", queue), b)
+	err = conn.Send("RPUSH", fmt.Sprintf("%s%s", namespace, queue), b)
 	conn.Flush()
 	if err != nil {
 		return err
