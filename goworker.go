@@ -28,14 +28,11 @@ func Work() error {
 
 	quit := signals()
 
-	pool := newRedisPool(uri, connections, connections, time.Minute)
-	defer pool.Close()
-
 	poller, err := newPoller(queues, isStrict)
 	if err != nil {
 		return err
 	}
-	jobs := poller.poll(pool, time.Duration(interval), quit)
+	jobs := poller.poll(getConnectionPool(), time.Duration(interval), quit)
 
 	var monitor sync.WaitGroup
 
@@ -44,7 +41,7 @@ func Work() error {
 		if err != nil {
 			return err
 		}
-		worker.work(pool, jobs, &monitor)
+		worker.work(getConnectionPool(), jobs, &monitor)
 	}
 
 	monitor.Wait()
