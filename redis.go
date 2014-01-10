@@ -10,6 +10,7 @@ import (
 
 var (
 	errorInvalidScheme = errors.New("Invalid Redis database URI scheme.")
+	pool               *pools.ResourcePool
 )
 
 type redisConn struct {
@@ -18,6 +19,14 @@ type redisConn struct {
 
 func (r *redisConn) Close() {
 	_ = r.Conn.Close()
+}
+
+// Retrieve a redis pool
+func getConnectionPool() *pools.ResourcePool {
+	if pool == nil || pool.IsClosed() {
+		pool = newRedisPool(uri, connections, connections, time.Minute)
+	}
+	return pool
 }
 
 func newRedisFactory(uri string) pools.Factory {
