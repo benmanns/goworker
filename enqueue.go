@@ -23,22 +23,21 @@ func Enqueue(queue string, class string, args []interface{}) (err error) {
 		return
 	}
 
+	var conn *redisConn
+
 	// Retrieve a connection from the pool or create a new one if no pool is opened.
 	if pool != nil && !pool.IsClosed() {
 		resource, err := pool.Get()
 		if err != nil {
-			logger.Criticalf("Error on getting connection in goworker.Enqueue(%s, %s, %v)", queue, class, args)
-			return
+			return err
 		}
-		conn := resource.(*redisConn)
+		conn = resource.(*redisConn)
 		defer pool.Put(conn)
 	} else {
 		// non-optimized mode, create a pool to avoid getting there.
-		logger.Warn("No open pool available, will create a temporary connection to Redis.")
-		conn, err := redisConnFromUri(uri)
-		if err {
-			logger.Criticalf("Error while connecting to Redis in goworker.Enqueue(%s, %s, %v)", queue, class, args)
-			return
+		conn, err = redisConnFromUri(uri)
+		if err != nil {
+			return err
 		}
 		defer conn.Close()
 	}
@@ -46,7 +45,6 @@ func Enqueue(queue string, class string, args []interface{}) (err error) {
 	// Push job in redis
 	err = conn.Send("RPUSH", fmt.Sprintf("%squeue:%s", namespace, queue), b)
 	if err != nil {
-		logger.Criticalf("Cannot push message to redis in goworker.Enqueue(%s, %s, %v)", queue, class, args)
 		return
 	}
 

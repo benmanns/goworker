@@ -58,7 +58,7 @@ func startWithPool(p *pools.ResourcePool) error {
 	if err != nil {
 		return err
 	}
-	jobs := poller.poll(getConnectionPool(), time.Duration(interval), quit)
+	jobs := poller.poll(p, time.Duration(interval), quit)
 
 	var monitor sync.WaitGroup
 
@@ -67,7 +67,7 @@ func startWithPool(p *pools.ResourcePool) error {
 		if err != nil {
 			return err
 		}
-		worker.work(getConnectionPool(), jobs, &monitor)
+		worker.work(p, jobs, &monitor)
 	}
 
 	monitor.Wait()
