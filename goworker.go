@@ -26,11 +26,13 @@ func Work() error {
 	return startWithPool(pool)
 }
 
+// Call this function to run goworker with the given pool.
 func WorkWithPool(pool *pools.ResourcePool) error {
 	initEnv()
 	return startWithPool(pool)
 }
 
+// Init logger and flags.
 func initEnv() error {
 	var err error
 	logger, err = seelog.LoggerFromWriterWithMinLevel(os.Stdout, seelog.InfoLvl)
@@ -44,6 +46,7 @@ func initEnv() error {
 	return nil
 }
 
+// Start worker with the given pool.
 func startWithPool(pool *pools.ResourcePool) error {
 	quit := signals()
 	poller, err := newPoller(queues, isStrict)
