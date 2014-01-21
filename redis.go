@@ -10,6 +10,7 @@ import (
 
 var (
 	errorInvalidScheme = errors.New("Invalid Redis database URI scheme.")
+	pool               *pools.ResourcePool
 )
 
 type redisConn struct {
