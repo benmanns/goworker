@@ -28,7 +28,10 @@ func Work() error {
 
 // Call this function to run goworker with the given pool.
 func WorkWithPool(pool *pools.ResourcePool) error {
-	initEnv()
+	err := initEnv()
+	if err != nil {
+		return err
+	}
 	return startWithPool(pool)
 }
 
