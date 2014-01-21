@@ -21,14 +21,6 @@ func (r *redisConn) Close() {
 	_ = r.Conn.Close()
 }
 
-// Retrieve a redis pool
-func getConnectionPool() *pools.ResourcePool {
-	if pool == nil || pool.IsClosed() {
-		pool = newRedisPool(uri, connections, connections, time.Minute)
-	}
-	return pool
-}
-
 func newRedisFactory(uri string) pools.Factory {
 	return func() (pools.Resource, error) {
 		return redisConnFromUri(uri)

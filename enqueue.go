@@ -14,7 +14,6 @@ import (
 //
 // return an error if args cannot be marshalled
 func Enqueue(queue string, class string, args []interface{}) (err error) {
-	pool := getConnectionPool()
 	data := &payload{
 		Class: class,
 		Args:  args,
@@ -23,14 +22,29 @@ func Enqueue(queue string, class string, args []interface{}) (err error) {
 	if err != nil {
 		return
 	}
-	resource, err := pool.Get()
-	if err != nil {
-		logger.Criticalf("Error on getting connection in goworker.Enqueue(%s, %s, %v)", queue, class, args)
-		return
+
+	// Retrieve a connection from the pool or create a new one if no pool is opened.
+	if pool != nil && !pool.IsClosed() {
+		resource, err := pool.Get()
+		if err != nil {
+			logger.Criticalf("Error on getting connection in goworker.Enqueue(%s, %s, %v)", queue, class, args)
+			return
+		}
+		conn := resource.(*redisConn)
+		defer pool.Put(conn)
+	} else {
+		// non-optimized mode, create a pool to avoid getting there.
+		logger.Warn("No open pool available, will create a temporary connection to Redis.")
+		conn, err := redisConnFromUri(uri)
+		if err {
+			logger.Criticalf("Error while connecting to Redis in goworker.Enqueue(%s, %s, %v)", queue, class, args)
+			return
+		}
+		defer conn.Close()
 	}
-	conn := resource.(*redisConn)
+
+	// Push job in redis
 	err = conn.Send("RPUSH", fmt.Sprintf("%squeue:%s", namespace, queue), b)
-	pool.Put(conn)
 	if err != nil {
 		logger.Criticalf("Cannot push message to redis in goworker.Enqueue(%s, %s, %v)", queue, class, args)
 		return
