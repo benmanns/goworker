@@ -29,14 +29,6 @@ func getConnectionPool() *pools.ResourcePool {
 	return pool
 }
 
-// Manually defines a connection pool
-func setConnectionPool(p *pools.ResourcePool) {
-	if !(pool == nil || pool.IsClosed()) {
-		pool.Close()
-	}
-	pool = p
-}
-
 func newRedisFactory(uri string) pools.Factory {
 	return func() (pools.Resource, error) {
 		return redisConnFromUri(uri)

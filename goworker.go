@@ -1,7 +1,6 @@
 package goworker
 
 import (
-	"code.google.com/p/vitess/go/pools"
 	"github.com/cihub/seelog"
 	"os"
 	"strconv"
@@ -17,11 +16,18 @@ var logger seelog.LoggerInterface
 // received, or until the queues are empty if the
 // -exit-on-complete flag is set.
 func Work() error {
-	err := initEnv()
+	var err error
+	logger, err = seelog.LoggerFromWriterWithMinLevel(os.Stdout, seelog.InfoLvl)
 	if err != nil {
 		return err
 	}
+
+	if err := flags(); err != nil {
+		return err
+	}
+
 	quit := signals()
+
 	poller, err := newPoller(queues, isStrict)
 	if err != nil {
 		return err
@@ -39,25 +45,6 @@ func Work() error {
 	}
 
 	monitor.Wait()
-	return nil
-}
 
-// Call this function to run goworker with the given pool.
-func WorkWithPool(pool *pools.ResourcePool) error {
-	setConnectionPool(pool)
-	return Work()
-}
-
-// Init logger and flags.
-func initEnv() error {
-	var err error
-	logger, err = seelog.LoggerFromWriterWithMinLevel(os.Stdout, seelog.InfoLvl)
-	if err != nil {
-		return err
-	}
-
-	if err := flags(); err != nil {
-		return err
-	}
 	return nil
 }
