@@ -26,7 +26,7 @@ func Work() error {
 		return err
 	}
 
-	quit := signals()
+	quit := Signals()
 
 	pool := newRedisPool(uri, connections, connections, time.Minute)
 	defer pool.Close()

@@ -44,7 +44,7 @@ import (
 	"syscall"
 )
 
-func signals() <-chan bool {
+func Signals() <-chan bool {
 	quit := make(chan bool)
 
 	go func() {
