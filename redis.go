@@ -13,7 +13,7 @@ var (
 
 func newRedisPool(uri string, capacity int, maxCapacity int, idleTimeout time.Duration) *redis.Pool {
 	return &redis.Pool {
-		MaxIdle: maxCapacity,
+		MaxActive: maxCapacity,
 		IdleTimeout: idleTimeout,
 		Dial: func () (redis.Conn, error) {
 			return redisConnFromUri(uri)
