@@ -1,7 +1,7 @@
 package goworker
 
 import (
-	"code.google.com/p/vitess/go/pools"
+	"github.com/garyburd/redigo/redis"
 	"encoding/json"
 	"fmt"
 	"time"
@@ -23,7 +23,7 @@ func newPoller(queues []string, isStrict bool) (*poller, error) {
 	}, nil
 }
 
-func (p *poller) getJob(conn *redisConn) (*job, error) {
+func (p *poller) getJob(conn redis.Conn) (*job, error) {
 	for _, queue := range p.queues(p.isStrict) {
 		logger.Debugf("Checking %s", queue)
 
@@ -46,32 +46,28 @@ func (p *poller) getJob(conn *redisConn) (*job, error) {
 	return nil, nil
 }
 
-func (p *poller) poll(pool *pools.ResourcePool, interval time.Duration, quit <-chan bool) <-chan *job {
+func (p *poller) poll(pool *redis.Pool, interval time.Duration, quit <-chan bool) <-chan *job {
 	jobs := make(chan *job)
 
-	resource, err := pool.Get()
-	if err != nil {
-		logger.Criticalf("Error on getting connection in poller %s", p)
-	} else {
-		conn := resource.(*redisConn)
-		p.open(conn)
-		p.start(conn)
-		pool.Put(conn)
+	conn := pool.Get()
+	err := p.open(conn)
+	if err == nil {
+		err = p.start(conn)
 	}
+	if err != nil {
+		logger.Criticalf("Error starting poller: %v", err)
+		panic(err)
+	}
+	conn.Close()
 
 	go func() {
 		defer func() {
 			close(jobs)
 
-			resource, err := pool.Get()
-			if err != nil {
-				logger.Criticalf("Error on getting connection in poller %s", p)
-			} else {
-				conn := resource.(*redisConn)
-				p.finish(conn)
-				p.close(conn)
-				pool.Put(conn)
-			}
+			conn := pool.Get()
+			p.finish(conn)
+			p.close(conn)
+			conn.Close()
 		}()
 
 		for {
@@ -79,53 +75,49 @@ func (p *poller) poll(pool *pools.ResourcePool, interval time.Duration, quit <-c
 			case <-quit:
 				return
 			default:
-				resource, err := pool.Get()
+				conn := pool.Get()
+				defer conn.Close()
+				job, err := p.getJob(conn)
 				if err != nil {
-					logger.Criticalf("Error on getting connection in poller %s", p)
-					return
-				} else {
-					conn := resource.(*redisConn)
-
-					job, err := p.getJob(conn)
+					logger.Criticalf("Error on %v getting job from %v: %v", p, p.Queues, err)
+					panic("Error on getting job from queue")
+				}
+				if job != nil {
+					conn.Send("INCR", fmt.Sprintf("%sstat:processed:%v", namespace, p))
+					err := conn.Flush()
 					if err != nil {
-						logger.Errorf("Error on %v getting job from %v: %v", p, p.Queues, err)
+						logger.Errorf("Error on %v while incrementing processed jobs for %v: %v", p, p.Queues, err)
 					}
-					if job != nil {
-						conn.Send("INCR", fmt.Sprintf("%sstat:processed:%v", namespace, p))
-						conn.Flush()
-						pool.Put(conn)
-						select {
-						case jobs <- job:
-						case <-quit:
-							buf, err := json.Marshal(job.Payload)
-							if err != nil {
-								logger.Criticalf("Error requeueing %v: %v", job, err)
-								return
-							}
-							resource, err := pool.Get()
-							if err != nil {
-								logger.Criticalf("Error on getting connection in poller %s", p)
-							}
 
-							conn := resource.(*redisConn)
-							conn.Send("LPUSH", fmt.Sprintf("%squeue:%s", namespace, job.Queue), buf)
-							conn.Flush()
-							return
+					select {
+					case jobs <- job:
+					case <-quit:
+						buf, err := json.Marshal(job.Payload)
+						if err == nil {
+							conn := pool.Get()
+							err = conn.Send("LPUSH", fmt.Sprintf("%squeue:%s", namespace, job.Queue), buf)
+							if err == nil {
+								err = conn.Flush()
+							}
 						}
+						if err != nil {
+							logger.Criticalf("Error requeueing %v: %v", job, err)
+							panic(err)
+						}
+						return
+					}
+				} else {
+					if exitOnComplete {
+						return
 					} else {
-						pool.Put(conn)
-						if exitOnComplete {
-							return
-						} else {
-							logger.Debugf("Sleeping for %v", interval)
-							logger.Debugf("Waiting for %v", p.Queues)
+						logger.Debugf("Sleeping for %v", interval)
+						logger.Debugf("Waiting for %v", p.Queues)
 
-							timeout := time.After(interval)
-							select {
-							case <-quit:
-								return
-							case <-timeout:
-							}
+						timeout := time.After(interval)
+						select {
+						case <-quit:
+							return
+						case <-timeout:
 						}
 					}
 				}

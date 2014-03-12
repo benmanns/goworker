@@ -1,7 +1,7 @@
 package goworker
 
 import (
-	"code.google.com/p/vitess/go/pools"
+	"github.com/garyburd/redigo/redis"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -27,7 +27,7 @@ func (w *worker) MarshalJSON() ([]byte, error) {
 	return json.Marshal(w.String())
 }
 
-func (w *worker) start(conn *redisConn, job *job) error {
+func (w *worker) start(conn redis.Conn, job *job) error {
 	work := &work{
 		Queue:   job.Queue,
 		RunAt:   time.Now(),
@@ -39,13 +39,16 @@ func (w *worker) start(conn *redisConn, job *job) error {
 		return err
 	}
 
-	conn.Send("SET", fmt.Sprintf("%sworker:%s", namespace, w), buffer)
+	err = conn.Send("SET", fmt.Sprintf("%sworker:%s", namespace, w), buffer)
+	if err != nil {
+		return err
+	}
 	logger.Debugf("Processing %s since %s [%v]", work.Queue, work.RunAt, work.Payload.Class)
 
 	return w.process.start(conn)
 }
 
-func (w *worker) fail(conn *redisConn, job *job, err error) error {
+func (w *worker) fail(conn redis.Conn, job *job, err error) error {
 	failure := &failure{
 		FailedAt:  time.Now(),
 		Payload:   job.Payload,
@@ -63,14 +66,14 @@ func (w *worker) fail(conn *redisConn, job *job, err error) error {
 	return w.process.fail(conn)
 }
 
-func (w *worker) succeed(conn *redisConn, job *job) error {
+func (w *worker) succeed(conn redis.Conn, job *job) error {
 	conn.Send("INCR", fmt.Sprintf("%sstat:processed", namespace))
 	conn.Send("INCR", fmt.Sprintf("%sstat:processed:%s", namespace, w))
 
 	return nil
 }
 
-func (w *worker) finish(conn *redisConn, job *job, err error) error {
+func (w *worker) finish(conn redis.Conn, job *job, err error) error {
 	if err != nil {
 		w.fail(conn, job, err)
 	} else {
@@ -79,28 +82,22 @@ func (w *worker) finish(conn *redisConn, job *job, err error) error {
 	return w.process.finish(conn)
 }
 
-func (w *worker) work(pool *pools.ResourcePool, jobs <-chan *job, monitor *sync.WaitGroup) {
-	resource, err := pool.Get()
-	if err != nil {
-		logger.Criticalf("Error on getting connection in worker %v", w)
-	} else {
-		conn := resource.(*redisConn)
-		w.open(conn)
-		pool.Put(conn)
+func (w *worker) work(pool *redis.Pool, jobs <-chan *job, monitor *sync.WaitGroup) {
+	conn := pool.Get()
+	if err := w.open(conn); err != nil {
+		logger.Criticalf("Error opening worker %v", w)
+		panic("Error opening worker")
 	}
-
+	conn.Close()
 	monitor.Add(1)
 
 	go func() {
 		defer func() {
-			resource, err := pool.Get()
-			if err != nil {
-				logger.Criticalf("Error on getting connection in worker %v", w)
-			} else {
-				conn := resource.(*redisConn)
-				w.close(conn)
-				pool.Put(conn)
+			conn := pool.Get()
+			if err := w.close(conn); err != nil {
+				logger.Errorf("Worker close failed: %v", err)
 			}
+			conn.Close()
 
 			monitor.Done()
 		}()
@@ -113,30 +110,24 @@ func (w *worker) work(pool *pools.ResourcePool, jobs <-chan *job, monitor *sync.
 				errorLog := fmt.Sprintf("No worker for %s in queue %s with args %v", job.Payload.Class, job.Queue, job.Payload.Args)
 				logger.Critical(errorLog)
 
-				resource, err := pool.Get()
-				if err != nil {
-					logger.Criticalf("Error on getting connection in worker %v", w)
-				} else {
-					conn := resource.(*redisConn)
-					w.finish(conn, job, errors.New(errorLog))
-					pool.Put(conn)
-				}
+				conn := pool.Get()
+				w.finish(conn, job, errors.New(errorLog))
+				conn.Close()
 			}
 		}
 	}()
 }
 
-func (w *worker) run(pool *pools.ResourcePool, job *job, workerFunc workerFunc) {
+func (w *worker) run(pool *redis.Pool, job *job, workerFunc workerFunc) {
 	var err error
 	defer func() {
-		resource, poolErr := pool.Get()
-		if poolErr != nil {
-			logger.Criticalf("Error on getting connection in worker %v", w)
-		} else {
-			conn := resource.(*redisConn)
-			w.finish(conn, job, err)
-			pool.Put(conn)
+		conn := pool.Get()
+		err := w.finish(conn, job, err)
+		conn.Close()
+		if err != nil {
+			logger.Errorf("Error finishing work: %v", err)
 		}
+
 	}()
 	defer func() {
 		if r := recover(); r != nil {
@@ -144,13 +135,12 @@ func (w *worker) run(pool *pools.ResourcePool, job *job, workerFunc workerFunc) 
 		}
 	}()
 
-	resource, err := pool.Get()
+	conn := pool.Get()
+	defer conn.Close()
+	err = w.start(conn, job)
 	if err != nil {
-		logger.Criticalf("Error on getting connection in worker %v", w)
-	} else {
-		conn := resource.(*redisConn)
-		w.start(conn, job)
-		pool.Put(conn)
+		return
 	}
+
 	err = workerFunc(job.Queue, job.Payload.Args...)
 }
