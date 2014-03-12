@@ -83,6 +83,7 @@ func (w *worker) work(pool *pools.ResourcePool, jobs <-chan *job, monitor *sync.
 	resource, err := pool.Get()
 	if err != nil {
 		logger.Criticalf("Error on getting connection in worker %v", w)
+		return
 	} else {
 		conn := resource.(*redisConn)
 		w.open(conn)
@@ -147,6 +148,7 @@ func (w *worker) run(pool *pools.ResourcePool, job *job, workerFunc workerFunc) 
 	resource, err := pool.Get()
 	if err != nil {
 		logger.Criticalf("Error on getting connection in worker %v", w)
+		return
 	} else {
 		conn := resource.(*redisConn)
 		w.start(conn, job)
