@@ -66,10 +66,11 @@ To create workers that share a database pool or other resources, use a closure t
 package main
 
 import (
+	"fmt"
 	"github.com/benmanns/goworker"
 )
 
-func newMyFunc(uri string) {
+func newMyFunc(uri string) (func(queue string, args ...interface{}) error) {
 	foo := NewFoo(uri)
 	return func(queue string, args ...interface{}) error {
 		foo.Bar(args)
@@ -78,7 +79,7 @@ func newMyFunc(uri string) {
 }
 
 func init() {
-	goworker.Register("MyClass", newMyFunc())
+	goworker.Register("MyClass", newMyFunc("http://www.example.com/"))
 }
 
 func main() {
