@@ -83,50 +83,48 @@ func (p *poller) poll(pool *pools.ResourcePool, interval time.Duration, quit <-c
 				if err != nil {
 					logger.Criticalf("Error on getting connection in poller %s", p)
 					return
-				} else {
-					conn := resource.(*redisConn)
+				}
+				conn := resource.(*redisConn)
 
-					job, err := p.getJob(conn)
-					if err != nil {
-						logger.Errorf("Error on %v getting job from %v: %v", p, p.Queues, err)
-					}
-					if job != nil {
-						conn.Send("INCR", fmt.Sprintf("%sstat:processed:%v", namespace, p))
+				job, err := p.getJob(conn)
+				if err != nil {
+					logger.Errorf("Error on %v getting job from %v: %v", p, p.Queues, err)
+				}
+				if job != nil {
+					conn.Send("INCR", fmt.Sprintf("%sstat:processed:%v", namespace, p))
+					conn.Flush()
+					pool.Put(conn)
+					select {
+					case jobs <- job:
+					case <-quit:
+						buf, err := json.Marshal(job.Payload)
+						if err != nil {
+							logger.Criticalf("Error requeueing %v: %v", job, err)
+							return
+						}
+						resource, err := pool.Get()
+						if err != nil {
+							logger.Criticalf("Error on getting connection in poller %s", p)
+						}
+
+						conn := resource.(*redisConn)
+						conn.Send("LPUSH", fmt.Sprintf("%squeue:%s", namespace, job.Queue), buf)
 						conn.Flush()
-						pool.Put(conn)
-						select {
-						case jobs <- job:
-						case <-quit:
-							buf, err := json.Marshal(job.Payload)
-							if err != nil {
-								logger.Criticalf("Error requeueing %v: %v", job, err)
-								return
-							}
-							resource, err := pool.Get()
-							if err != nil {
-								logger.Criticalf("Error on getting connection in poller %s", p)
-							}
+						return
+					}
+				} else {
+					pool.Put(conn)
+					if exitOnComplete {
+						return
+					}
+					logger.Debugf("Sleeping for %v", interval)
+					logger.Debugf("Waiting for %v", p.Queues)
 
-							conn := resource.(*redisConn)
-							conn.Send("LPUSH", fmt.Sprintf("%squeue:%s", namespace, job.Queue), buf)
-							conn.Flush()
-							return
-						}
-					} else {
-						pool.Put(conn)
-						if exitOnComplete {
-							return
-						} else {
-							logger.Debugf("Sleeping for %v", interval)
-							logger.Debugf("Waiting for %v", p.Queues)
-
-							timeout := time.After(interval)
-							select {
-							case <-quit:
-								return
-							case <-timeout:
-							}
-						}
+					timeout := time.After(interval)
+					select {
+					case <-quit:
+						return
+					case <-timeout:
 					}
 				}
 			}

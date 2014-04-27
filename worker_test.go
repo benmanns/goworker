@@ -17,7 +17,7 @@ var workerMarshalJSONTests = []struct {
 			process: process{
 				Hostname: "hostname",
 				Pid:      12345,
-				Id:       "123",
+				ID:       "123",
 				Queues:   []string{"high", "low"},
 			},
 		},

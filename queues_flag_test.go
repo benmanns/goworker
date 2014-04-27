@@ -14,7 +14,7 @@ var queuesFlagSetTests = []struct {
 	{
 		"",
 		nil,
-		errors.New("You must specify at least one queue."),
+		errors.New("you must specify at least one queue"),
 	},
 	{
 		"high",
@@ -44,22 +44,22 @@ var queuesFlagSetTests = []struct {
 	{
 		"low=,high=2",
 		nil,
-		errors.New("The weight must be a numeric value."),
+		errors.New("the weight must be a numeric value"),
 	},
 	{
 		"low=a,high=2",
 		nil,
-		errors.New("The weight must be a numeric value."),
+		errors.New("the weight must be a numeric value"),
 	},
 	{
 		"low=",
 		nil,
-		errors.New("The weight must be a numeric value."),
+		errors.New("the weight must be a numeric value"),
 	},
 	{
 		"low=a",
 		nil,
-		errors.New("The weight must be a numeric value."),
+		errors.New("the weight must be a numeric value"),
 	},
 	{
 		"high=2,,,=1",
@@ -69,12 +69,12 @@ var queuesFlagSetTests = []struct {
 	{
 		",,,",
 		nil,
-		errors.New("You must specify at least one queue."),
+		errors.New("you must specify at least one queue"),
 	},
 	{
 		"=1",
 		nil,
-		errors.New("You must specify at least one queue."),
+		errors.New("you must specify at least one queue"),
 	},
 }
 

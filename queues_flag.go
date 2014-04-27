@@ -8,8 +8,8 @@ import (
 )
 
 var (
-	errorEmptyQueues      = errors.New("You must specify at least one queue.")
-	errorNonNumericWeight = errors.New("The weight must be a numeric value.")
+	errorEmptyQueues      = errors.New("you must specify at least one queue")
+	errorNonNumericWeight = errors.New("the weight must be a numeric value")
 )
 
 type queuesFlag []string

@@ -11,7 +11,7 @@ import (
 type process struct {
 	Hostname string
 	Pid      int
-	Id       string
+	ID       string
 	Queues   []string
 }
 
@@ -24,13 +24,13 @@ func newProcess(id string, queues []string) (*process, error) {
 	return &process{
 		Hostname: hostname,
 		Pid:      os.Getpid(),
-		Id:       id,
+		ID:       id,
 		Queues:   queues,
 	}, nil
 }
 
 func (p *process) String() string {
-	return fmt.Sprintf("%s:%d-%s:%s", p.Hostname, p.Pid, p.Id, strings.Join(p.Queues, ","))
+	return fmt.Sprintf("%s:%d-%s:%s", p.Hostname, p.Pid, p.ID, strings.Join(p.Queues, ","))
 }
 
 func (p *process) open(conn *redisConn) error {

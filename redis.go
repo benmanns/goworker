@@ -9,7 +9,7 @@ import (
 )
 
 var (
-	errorInvalidScheme = errors.New("Invalid Redis database URI scheme.")
+	errorInvalidScheme = errors.New("invalid Redis database URI scheme")
 )
 
 type redisConn struct {

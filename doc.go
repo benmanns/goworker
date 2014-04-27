@@ -1,8 +1,8 @@
-// goworker is a Resque-compatible, Go-based background
-// worker. It allows you to push jobs into a queue using an
-// expressive language like Ruby while harnessing the
-// efficiency and concurrency of Go to minimize job latency
-// and cost.
+// Package goworker is a Resque-compatible, Go-based
+// background worker. It allows you to push jobs into a
+// queue using an expressive language like Ruby while
+// harnessing the efficiency and concurrency of Go to
+// minimize job latency and cost.
 //
 // goworker workers can run alongside Ruby Resque clients
 // so that you can keep all but your most

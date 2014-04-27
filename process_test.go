@@ -16,7 +16,7 @@ var processStringTests = []struct {
 		process{
 			Hostname: "hostname",
 			Pid:      12345,
-			Id:       "123",
+			ID:       "123",
 			Queues:   []string{"high", "low"},
 		},
 		"hostname:12345-123:high,low",
