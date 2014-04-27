@@ -46,7 +46,7 @@ import (
 
 func myFunc(queue string, args ...interface{}) error {
 	fmt.Printf("From %s, %v", queue, args)
-	return
+	return nil
 }
 
 func init() {
