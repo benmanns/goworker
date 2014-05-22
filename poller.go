@@ -1,6 +1,7 @@
 package goworker
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"time"
@@ -35,7 +36,12 @@ func (p *poller) getJob(conn *RedisConn) (*job, error) {
 
 			job := &job{Queue: queue}
 
-			if err := json.Unmarshal(reply.([]byte), &job.Payload); err != nil {
+			decoder := json.NewDecoder(bytes.NewReader(reply.([]byte)))
+			if useNumber {
+				decoder.UseNumber()
+			}
+
+			if err := decoder.Decode(&job.Payload); err != nil {
 				return nil, err
 			}
 			return job, nil

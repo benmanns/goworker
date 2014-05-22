@@ -94,16 +94,24 @@ goworker worker functions receive the queue they are serving and a slice of inte
 ```go
 // Expecting (int, string, float64)
 func myFunc(queue, args ...interface{}) error {
-	id, ok := args[0].(int)
+	idNum, ok := args[0].(json.Number)
 	if !ok {
+		return errorInvalidParam
+	}
+	id, err := idNum.Int64()
+	if err != nil {
 		return errorInvalidParam
 	}
 	name, ok := args[1].(string)
 	if !ok {
 		return errorInvalidParam
 	}
-	weight, ok := args[2].(float64)
+	weightNum, ok := args[2].(json.Number)
 	if !ok {
+		return errorInvalidParam
+	}
+	weight, err := weightNum.Float64()
+	if err != nil {
 		return errorInvalidParam
 	}
 	doSomething(id, name, weight)

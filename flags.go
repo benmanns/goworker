@@ -69,6 +69,14 @@
 // with the time command to benchmark different
 // configurations.
 //
+// -use-number=false
+// — Uses json.Number when decoding numbers in the
+// job payloads. This will avoid issues that
+// occur when goworker and the json package decode
+// large numbers as floats, which then get
+// encoded in scientific notation, losing
+// pecision. This will default to true soon.
+//
 // You can also configure your own flags for use
 // within your workers. Be sure to set them
 // before calling goworker.Main(). It is okay to
@@ -94,6 +102,7 @@ var (
 	namespace      string
 	exitOnComplete bool
 	isStrict       bool
+	useNumber      bool
 )
 
 // Namespace returns the namespace flag for goworker. You
@@ -127,6 +136,8 @@ func init() {
 	flag.StringVar(&namespace, "namespace", "resque:", "the Redis namespace")
 
 	flag.BoolVar(&exitOnComplete, "exit-on-complete", false, "exit when the queue is empty")
+
+	flag.BoolVar(&useNumber, "use-number", false, "use json.Number instead of float64 when decoding numbers in JSON. will default to true soon")
 }
 
 func flags() error {
@@ -140,5 +151,13 @@ func flags() error {
 		return err
 	}
 	isStrict = strings.IndexRune(queuesString, '=') == -1
+
+	if !useNumber {
+		logger.Warn("== DEPRECATION WARNING ==")
+		logger.Warn("  Currently, encoding/json decodes numbers as float64.")
+		logger.Warn("  This can cause numbers to lose precision as they are read from the Resque queue.")
+		logger.Warn("  Set the -use-numbers flag to use json.Number when decoding numbers and remove this warning.")
+	}
+
 	return nil
 }
