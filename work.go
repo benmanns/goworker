@@ -7,5 +7,5 @@ import (
 type work struct {
 	Queue   string    `json:"queue"`
 	RunAt   time.Time `json:"run_at"`
-	Payload payload   `json:"payload"`
+	Payload Payload   `json:"payload"`
 }

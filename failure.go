@@ -6,7 +6,7 @@ import (
 
 type failure struct {
 	FailedAt  time.Time `json:"failed_at"`
-	Payload   payload   `json:"payload"`
+	Payload   Payload   `json:"payload"`
 	Exception string    `json:"exception"`
 	Error     string    `json:"error"`
 	Backtrace []string  `json:"backtrace"`

@@ -1,6 +1,6 @@
 package goworker
 
-type payload struct {
+type Payload struct {
 	Class string        `json:"class"`
 	Args  []interface{} `json:"args"`
 }
