@@ -12,11 +12,11 @@ var (
 	errorInvalidScheme = errors.New("invalid Redis database URI scheme")
 )
 
-type redisConn struct {
+type RedisConn struct {
 	redis.Conn
 }
 
-func (r *redisConn) Close() {
+func (r *RedisConn) Close() {
 	_ = r.Conn.Close()
 }
 
@@ -30,7 +30,7 @@ func newRedisPool(uri string, capacity int, maxCapacity int, idleTimout time.Dur
 	return pools.NewResourcePool(newRedisFactory(uri), capacity, maxCapacity, idleTimout)
 }
 
-func redisConnFromUri(uriString string) (*redisConn, error) {
+func redisConnFromUri(uriString string) (*RedisConn, error) {
 	uri, err := url.Parse(uriString)
 	if err != nil {
 		return nil, err
@@ -79,5 +79,5 @@ func redisConnFromUri(uriString string) (*redisConn, error) {
 		}
 	}
 
-	return &redisConn{Conn: conn}, nil
+	return &RedisConn{Conn: conn}, nil
 }

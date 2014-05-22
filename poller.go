@@ -1,7 +1,6 @@
 package goworker
 
 import (
-	"code.google.com/p/vitess/go/pools"
 	"encoding/json"
 	"fmt"
 	"time"
@@ -23,7 +22,7 @@ func newPoller(queues []string, isStrict bool) (*poller, error) {
 	}, nil
 }
 
-func (p *poller) getJob(conn *redisConn) (*job, error) {
+func (p *poller) getJob(conn *RedisConn) (*job, error) {
 	for _, queue := range p.queues(p.isStrict) {
 		logger.Debugf("Checking %s", queue)
 
@@ -46,31 +45,29 @@ func (p *poller) getJob(conn *redisConn) (*job, error) {
 	return nil, nil
 }
 
-func (p *poller) poll(pool *pools.ResourcePool, interval time.Duration, quit <-chan bool) <-chan *job {
+func (p *poller) poll(interval time.Duration, quit <-chan bool) <-chan *job {
 	jobs := make(chan *job)
 
-	resource, err := pool.Get()
+	conn, err := GetConn()
 	if err != nil {
 		logger.Criticalf("Error on getting connection in poller %s", p)
 	} else {
-		conn := resource.(*redisConn)
 		p.open(conn)
 		p.start(conn)
-		pool.Put(conn)
+		PutConn(conn)
 	}
 
 	go func() {
 		defer func() {
 			close(jobs)
 
-			resource, err := pool.Get()
+			conn, err := GetConn()
 			if err != nil {
 				logger.Criticalf("Error on getting connection in poller %s", p)
 			} else {
-				conn := resource.(*redisConn)
 				p.finish(conn)
 				p.close(conn)
-				pool.Put(conn)
+				PutConn(conn)
 			}
 		}()
 
@@ -79,12 +76,10 @@ func (p *poller) poll(pool *pools.ResourcePool, interval time.Duration, quit <-c
 			case <-quit:
 				return
 			default:
-				resource, err := pool.Get()
+				conn, err := GetConn()
 				if err != nil {
 					logger.Criticalf("Error on getting connection in poller %s", p)
-					return
 				}
-				conn := resource.(*redisConn)
 
 				job, err := p.getJob(conn)
 				if err != nil {
@@ -93,7 +88,7 @@ func (p *poller) poll(pool *pools.ResourcePool, interval time.Duration, quit <-c
 				if job != nil {
 					conn.Send("INCR", fmt.Sprintf("%sstat:processed:%v", namespace, p))
 					conn.Flush()
-					pool.Put(conn)
+					PutConn(conn)
 					select {
 					case jobs <- job:
 					case <-quit:
@@ -102,18 +97,17 @@ func (p *poller) poll(pool *pools.ResourcePool, interval time.Duration, quit <-c
 							logger.Criticalf("Error requeueing %v: %v", job, err)
 							return
 						}
-						resource, err := pool.Get()
+						conn, err := GetConn()
 						if err != nil {
 							logger.Criticalf("Error on getting connection in poller %s", p)
 						}
 
-						conn := resource.(*redisConn)
 						conn.Send("LPUSH", fmt.Sprintf("%squeue:%s", namespace, job.Queue), buf)
 						conn.Flush()
 						return
 					}
 				} else {
-					pool.Put(conn)
+					PutConn(conn)
 					if exitOnComplete {
 						return
 					}
