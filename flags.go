@@ -96,6 +96,13 @@ var (
 	isStrict       bool
 )
 
+// Namespace returns the namespace flag for goworker. You
+// can use this with the GetConn and PutConn functions to
+// operate on the same namespace that goworker uses.
+func Namespace() string {
+	return namespace
+}
+
 func init() {
 	flag.StringVar(&queuesString, "queues", "", "a comma-separated list of Resque queues")
 
