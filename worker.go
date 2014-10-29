@@ -147,7 +147,7 @@ func (w *worker) run(job *job, workerFunc workerFunc) {
 		PutConn(conn)
 	}
 
-	err = workerFunc(job.Queue, job.Payload.Args...)
+	err = workerFunc(job.Queue, job.Payload.Args)
 	if err != nil {
 		logger.Criticalf("Got error from worker %v", err)
 	}
