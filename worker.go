@@ -149,6 +149,6 @@ func (w *worker) run(job *job, workerFunc workerFunc) {
 
 	err = workerFunc(job.Queue, job.Payload.Args)
 	if err != nil {
-		logger.Criticalf("Got error from worker %v", err)
+		logger.Debugf("Got error from worker '%v'", err)
 	}
 }
