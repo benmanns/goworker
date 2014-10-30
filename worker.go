@@ -146,5 +146,9 @@ func (w *worker) run(job *job, workerFunc workerFunc) {
 		w.start(conn, job)
 		PutConn(conn)
 	}
-	err = workerFunc(job.Queue, job.Payload.Args...)
+
+	err = workerFunc(job.Queue, job.Payload.Args)
+	if err != nil {
+		logger.Debugf("Got error from worker '%v'", err)
+	}
 }
