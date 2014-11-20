@@ -23,7 +23,48 @@ func newPoller(queues []string, isStrict bool) (*poller, error) {
 	}, nil
 }
 
+func (p *poller) getDeferred(conn *RedisConn) error {
+	// Do a check for deferred jobs
+	reply, err := deferredCommand.Do(conn.Conn, fmt.Sprintf("%s_deferred", namespace), int32(time.Now().Unix()))
+	if reply == nil {
+		// Got no deferred jobs
+		return nil
+	} else if err == nil {
+		// Got a reply
+		deferred := &Deferred{}
+		logger.Infof("Decoding %v", string(reply.([]byte)))
+		decoder := json.NewDecoder(bytes.NewReader(reply.([]byte)))
+		decoder.UseNumber()
+		if err := decoder.Decode(&deferred); err != nil {
+			logger.Criticalf("Got error when processing deferred reply %v", err)
+			return err
+		}
+
+		buf, err := json.Marshal(deferred)
+		logger.Infof("Marshalled %v", string(buf))
+		if err != nil {
+			logger.Criticalf("Error requeueing %v: %v", deferred, err)
+			return err
+		}
+
+		conn.Send("LPUSH", fmt.Sprintf("%squeue:%s", namespace, deferred.Queue), buf)
+		conn.Flush()
+	} else {
+		// We got an error!
+		logger.Criticalf("Got error when checking deferred queue %v %v", err, string(reply.([]byte)))
+		return err
+	}
+
+	return nil
+}
+
 func (p *poller) getJob(conn *RedisConn) (*job, error) {
+	logger.Debugf("Checking deferred queue")
+	err := p.getDeferred(conn)
+	if err != nil {
+		return nil, err
+	}
+
 	for _, queue := range p.queues(p.isStrict) {
 		logger.Debugf("Checking %s", queue)
 
