@@ -34,9 +34,9 @@ func (p *process) String() string {
 }
 
 func (p *process) open(conn *RedisConn) error {
-	conn.Send("SADD", fmt.Sprintf("%sworkers", namespace), p)
-	conn.Send("SET", fmt.Sprintf("%sstat:processed:%v", namespace, p), "0")
-	conn.Send("SET", fmt.Sprintf("%sstat:failed:%v", namespace, p), "0")
+	conn.Send("SADD", fmt.Sprintf("%s:workers", namespace), p)
+	conn.Send("SET", fmt.Sprintf("%s:stat:processed:%v", namespace, p), "0")
+	conn.Send("SET", fmt.Sprintf("%s:stat:failed:%v", namespace, p), "0")
 	conn.Flush()
 
 	return nil
@@ -44,32 +44,32 @@ func (p *process) open(conn *RedisConn) error {
 
 func (p *process) close(conn *RedisConn) error {
 	logger.Infof("%v shutdown", p)
-	conn.Send("SREM", fmt.Sprintf("%sworkers", namespace), p)
-	conn.Send("DEL", fmt.Sprintf("%sstat:processed:%s", namespace, p))
-	conn.Send("DEL", fmt.Sprintf("%sstat:failed:%s", namespace, p))
+	conn.Send("SREM", fmt.Sprintf("%s:workers", namespace), p)
+	conn.Send("DEL", fmt.Sprintf("%s:stat:processed:%s", namespace, p))
+	conn.Send("DEL", fmt.Sprintf("%s:stat:failed:%s", namespace, p))
 	conn.Flush()
 
 	return nil
 }
 
 func (p *process) start(conn *RedisConn) error {
-	conn.Send("SET", fmt.Sprintf("%sworker:%s:started", namespace, p), time.Now().String())
+	conn.Send("SET", fmt.Sprintf("%s:worker:%s:started", namespace, p), time.Now().String())
 	conn.Flush()
 
 	return nil
 }
 
 func (p *process) finish(conn *RedisConn) error {
-	conn.Send("DEL", fmt.Sprintf("%sworker:%s", namespace, p))
-	conn.Send("DEL", fmt.Sprintf("%sworker:%s:started", namespace, p))
+	conn.Send("DEL", fmt.Sprintf("%s:worker:%s", namespace, p))
+	conn.Send("DEL", fmt.Sprintf("%s:worker:%s:started", namespace, p))
 	conn.Flush()
 
 	return nil
 }
 
 func (p *process) fail(conn *RedisConn) error {
-	conn.Send("INCR", fmt.Sprintf("%sstat:failed", namespace))
-	conn.Send("INCR", fmt.Sprintf("%sstat:failed:%s", namespace, p))
+	conn.Send("INCR", fmt.Sprintf("%s:stat:failed", namespace))
+	conn.Send("INCR", fmt.Sprintf("%s:stat:failed:%s", namespace, p))
 	conn.Flush()
 
 	return nil

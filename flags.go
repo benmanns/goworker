@@ -133,7 +133,7 @@ func init() {
 	}
 	flag.StringVar(&uri, "uri", redisEnvUri, "the URI of the Redis server")
 
-	flag.StringVar(&namespace, "namespace", "resque:", "the Redis namespace")
+	flag.StringVar(&namespace, "namespace", "resque", "the Redis namespace")
 
 	flag.BoolVar(&exitOnComplete, "exit-on-complete", false, "exit when the queue is empty")
 
