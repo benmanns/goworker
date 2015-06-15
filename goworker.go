@@ -1,12 +1,15 @@
 package goworker
 
 import (
-	"code.google.com/p/vitess/go/pools"
-	"github.com/cihub/seelog"
 	"os"
 	"strconv"
 	"sync"
 	"time"
+
+	"golang.org/x/net/context"
+
+	"github.com/cihub/seelog"
+	"github.com/youtube/vitess/go/pools"
 )
 
 var (
@@ -41,7 +44,7 @@ func Init() error {
 // while they wait for an available connection. Expect this
 // API to change drastically.
 func GetConn() (*RedisConn, error) {
-	resource, err := pool.Get()
+	resource, err := pool.Get(context.TODO())
 
 	if err != nil {
 		return nil, err
