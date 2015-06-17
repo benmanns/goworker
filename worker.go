@@ -8,25 +8,33 @@ import (
 	"time"
 )
 
-type worker struct {
+type Worker struct {
 	process
 }
 
-func newWorker(id string, queues []string) (*worker, error) {
+func newWorker(id string, queues []string) (*Worker, error) {
 	process, err := newProcess(id, queues)
 	if err != nil {
 		return nil, err
 	}
-	return &worker{
+	return &Worker{
 		process: *process,
 	}, nil
 }
 
-func (w *worker) MarshalJSON() ([]byte, error) {
+func (w *Worker) MarshalJSON() ([]byte, error) {
 	return json.Marshal(w.String())
 }
 
-func (w *worker) start(conn *RedisConn, job *job) error {
+func (w *Worker) RetryJob(job *Job) error {
+	conn, err := GetConn()
+	if err != nil {
+		return err
+	}
+	return w.process.repush(conn,job)
+}
+
+func (w *Worker) start(conn *RedisConn, job *Job) error {
 	work := &work{
 		Queue:   job.Queue,
 		RunAt:   time.Now(),
@@ -44,7 +52,7 @@ func (w *worker) start(conn *RedisConn, job *job) error {
 	return w.process.start(conn)
 }
 
-func (w *worker) fail(conn *RedisConn, job *job, err error) error {
+func (w *Worker) fail(conn *RedisConn, job *Job, err error) error {
 	failure := &failure{
 		FailedAt:  time.Now(),
 		Payload:   job.Payload,
@@ -62,14 +70,14 @@ func (w *worker) fail(conn *RedisConn, job *job, err error) error {
 	return w.process.fail(conn)
 }
 
-func (w *worker) succeed(conn *RedisConn, job *job) error {
+func (w *Worker) succeed(conn *RedisConn, job *Job) error {
 	conn.Send("INCR", fmt.Sprintf("%sstat:processed", namespace))
 	conn.Send("INCR", fmt.Sprintf("%sstat:processed:%s", namespace, w))
 
 	return nil
 }
 
-func (w *worker) finish(conn *RedisConn, job *job, err error) error {
+func (w *Worker) finish(conn *RedisConn, job *Job, err error) error {
 	if err != nil {
 		w.fail(conn, job, err)
 	} else {
@@ -78,7 +86,7 @@ func (w *worker) finish(conn *RedisConn, job *job, err error) error {
 	return w.process.finish(conn)
 }
 
-func (w *worker) work(jobs <-chan *job, monitor *sync.WaitGroup) {
+func (w *Worker) work(jobs <-chan *Job, monitor *sync.WaitGroup) {
 	conn, err := GetConn()
 	if err != nil {
 		logger.Criticalf("Error on getting connection in worker %v", w)
@@ -125,7 +133,7 @@ func (w *worker) work(jobs <-chan *job, monitor *sync.WaitGroup) {
 	}()
 }
 
-func (w *worker) run(job *job, workerFunc workerFunc) {
+func (w *Worker) run(job *Job, workerFunc workerFunc) {
 	var err error
 	defer func() {
 		conn, errCon := GetConn()
@@ -151,5 +159,6 @@ func (w *worker) run(job *job, workerFunc workerFunc) {
 		w.start(conn, job)
 		PutConn(conn)
 	}
-	err = workerFunc(job.Queue, job.Payload.Args...)
+	//err = workerFunc(job.Queue, job.Payload.Args...)
+	err = workerFunc(w, job)
 }

@@ -10,6 +10,6 @@ type failure struct {
 	Exception string    `json:"exception"`
 	Error     string    `json:"error"`
 	Backtrace []string  `json:"backtrace"`
-	Worker    *worker   `json:"worker"`
+	Worker    *Worker   `json:"worker"`
 	Queue     string    `json:"queue"`
 }

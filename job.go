@@ -1,6 +1,6 @@
 package goworker
 
-type job struct {
+type Job struct {
 	Queue   string
 	Payload Payload
 }
