@@ -1,7 +1,7 @@
 package goworker
 
 import (
-	"code.google.com/p/vitess/go/pools"
+	"github.com/youtube/vitess/go/pools"
 	"errors"
 	"github.com/garyburd/redigo/redis"
 	"net/url"
