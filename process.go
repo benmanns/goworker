@@ -6,6 +6,7 @@ import (
 	"os"
 	"strings"
 	"time"
+	"encoding/json"
 )
 
 type process struct {
@@ -72,6 +73,16 @@ func (p *process) fail(conn *RedisConn) error {
 	conn.Send("INCR", fmt.Sprintf("%sstat:failed:%s", namespace, p))
 	conn.Flush()
 
+	return nil
+}
+
+func (p *process) repush(conn *RedisConn, job *Job) error {
+	buf, err := json.Marshal(job.Payload)
+	if err != nil {
+		return err
+	}
+	conn.Send("RPUSH", fmt.Sprintf("%squeue:%s", namespace, job.Queue), buf)
+	conn.Flush()
 	return nil
 }
 

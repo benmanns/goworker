@@ -1,8 +1,9 @@
 package goworker
 
 import (
-	"code.google.com/p/vitess/go/pools"
+	"github.com/youtube/vitess/go/pools"
 	"github.com/cihub/seelog"
+	"golang.org/x/net/context"
 	"os"
 	"strconv"
 	"sync"
@@ -12,6 +13,7 @@ import (
 var (
 	logger seelog.LoggerInterface
 	pool   *pools.ResourcePool
+	ctx    context.Context
 )
 
 // Init initializes the goworker process. This will be
@@ -28,6 +30,7 @@ func Init() error {
 	if err := flags(); err != nil {
 		return err
 	}
+	ctx = context.Background()
 
 	pool = newRedisPool(uri, connections, connections, time.Minute)
 
@@ -41,7 +44,7 @@ func Init() error {
 // while they wait for an available connection. Expect this
 // API to change drastically.
 func GetConn() (*RedisConn, error) {
-	resource, err := pool.Get()
+	resource, err := pool.Get(ctx)
 
 	if err != nil {
 		return nil, err
