@@ -1,8 +1,8 @@
 package goworker
 
 import (
-	"code.google.com/p/vitess/go/pools"
 	"github.com/cihub/seelog"
+	"github.com/youtube/vitess/go/pools"
 	"os"
 	"strconv"
 	"sync"
@@ -41,7 +41,7 @@ func Init() error {
 // while they wait for an available connection. Expect this
 // API to change drastically.
 func GetConn() (*RedisConn, error) {
-	resource, err := pool.Get()
+	resource, err := pool.Get(nil)
 
 	if err != nil {
 		return nil, err
