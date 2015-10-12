@@ -5,6 +5,9 @@ go:
   - 1.2
   - tip
 
+services:
+  - redis-server
+
 matrix:
   allowed_failures:
     go:

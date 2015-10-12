@@ -1,6 +1,7 @@
 package goworker
 
 import (
+	"reflect"
 	"testing"
 )
 
@@ -36,4 +37,55 @@ func TestWorkerMarshalJSON(t *testing.T) {
 			}
 		}
 	}
+}
+
+func TestEnqueue(t *testing.T) {
+	expectedArgs := []interface{}{"a", "lot", "of", "params"}
+	jobName := "SomethingCool"
+	queueName := "testQueue"
+	expectedJob := &Job{
+		Queue: queueName,
+		Payload: Payload{
+			Class: jobName,
+			Args:  expectedArgs,
+		},
+	}
+
+	queues = []string{queueName}
+	useNumber = true
+	exitOnComplete = true
+
+	err := Enqueue(expectedJob)
+	if err != nil {
+		t.Errorf("Error while enqueue %s", err)
+	}
+
+	actualArgs := []interface{}{}
+	actualQueueName := ""
+	Register(jobName, func(queue string, args ...interface{}) error {
+		actualArgs = args
+		actualQueueName = queue
+		return nil
+	})
+	if err := Work(); err != nil {
+		t.Errorf("(Enqueue) Failed on work %s", err)
+	}
+	if !reflect.DeepEqual(actualArgs, expectedArgs) {
+		t.Errorf("(Enqueue) Expected %v, actual %v", actualArgs, expectedArgs)
+	}
+	if !reflect.DeepEqual(actualQueueName, queueName) {
+		t.Errorf("(Enqueue) Expected %v, actual %v", actualQueueName, queueName)
+	}
+
+	// <-waiter
+
+	// actualJob := &Job{Queue: "a_queue", Payload: Payload{}}
+	// err = json.Unmarshal(reply.([]byte), &actualJob.Payload)
+
+	// if err != nil {
+	// 	t.Errorf("(Enqueue) Failed unmarshal %s", err)
+	// }
+	// if reflect.DeepEqual(actualJob, expectedJob) {
+	// 	t.Errorf("(Enqueue) Expected %v, actual %v", actualJob, expectedJob)
+	// }
 }
