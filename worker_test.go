@@ -76,16 +76,4 @@ func TestEnqueue(t *testing.T) {
 	if !reflect.DeepEqual(actualQueueName, queueName) {
 		t.Errorf("(Enqueue) Expected %v, actual %v", actualQueueName, queueName)
 	}
-
-	// <-waiter
-
-	// actualJob := &Job{Queue: "a_queue", Payload: Payload{}}
-	// err = json.Unmarshal(reply.([]byte), &actualJob.Payload)
-
-	// if err != nil {
-	// 	t.Errorf("(Enqueue) Failed unmarshal %s", err)
-	// }
-	// if reflect.DeepEqual(actualJob, expectedJob) {
-	// 	t.Errorf("(Enqueue) Expected %v, actual %v", actualJob, expectedJob)
-	// }
 }
