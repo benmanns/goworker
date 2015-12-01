@@ -1,6 +1,7 @@
 package goworker
 
 import (
+	"reflect"
 	"testing"
 )
 
@@ -35,5 +36,44 @@ func TestWorkerMarshalJSON(t *testing.T) {
 				t.Errorf("Worker(%#v): expected %s, actual %s", tt.w, tt.expected, actual)
 			}
 		}
+	}
+}
+
+func TestEnqueue(t *testing.T) {
+	expectedArgs := []interface{}{"a", "lot", "of", "params"}
+	jobName := "SomethingCool"
+	queueName := "testQueue"
+	expectedJob := &Job{
+		Queue: queueName,
+		Payload: Payload{
+			Class: jobName,
+			Args:  expectedArgs,
+		},
+	}
+
+	queues = []string{queueName}
+	useNumber = true
+	exitOnComplete = true
+
+	err := Enqueue(expectedJob)
+	if err != nil {
+		t.Errorf("Error while enqueue %s", err)
+	}
+
+	actualArgs := []interface{}{}
+	actualQueueName := ""
+	Register(jobName, func(queue string, args ...interface{}) error {
+		actualArgs = args
+		actualQueueName = queue
+		return nil
+	})
+	if err := Work(); err != nil {
+		t.Errorf("(Enqueue) Failed on work %s", err)
+	}
+	if !reflect.DeepEqual(actualArgs, expectedArgs) {
+		t.Errorf("(Enqueue) Expected %v, actual %v", actualArgs, expectedArgs)
+	}
+	if !reflect.DeepEqual(actualQueueName, queueName) {
+		t.Errorf("(Enqueue) Expected %v, actual %v", actualQueueName, queueName)
 	}
 }

@@ -1,13 +1,15 @@
 package goworker
 
 import (
-	"github.com/youtube/vitess/go/pools"
-	"github.com/cihub/seelog"
-	"golang.org/x/net/context"
 	"os"
 	"strconv"
 	"sync"
 	"time"
+
+	"golang.org/x/net/context"
+
+	"github.com/cihub/seelog"
+	"github.com/youtube/vitess/go/pools"
 )
 
 var (

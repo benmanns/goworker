@@ -23,7 +23,7 @@ func newPoller(queues []string, isStrict bool) (*poller, error) {
 	}, nil
 }
 
-func (p *poller) getJob(conn *RedisConn) (*job, error) {
+func (p *poller) getJob(conn *RedisConn) (*Job, error) {
 	for _, queue := range p.queues(p.isStrict) {
 		logger.Debugf("Checking %s", queue)
 
@@ -34,7 +34,7 @@ func (p *poller) getJob(conn *RedisConn) (*job, error) {
 		if reply != nil {
 			logger.Debugf("Found job on %s", queue)
 
-			job := &job{Queue: queue}
+			job := &Job{Queue: queue}
 
 			decoder := json.NewDecoder(bytes.NewReader(reply.([]byte)))
 			if useNumber {
@@ -51,8 +51,8 @@ func (p *poller) getJob(conn *RedisConn) (*job, error) {
 	return nil, nil
 }
 
-func (p *poller) poll(interval time.Duration, quit <-chan bool) <-chan *job {
-	jobs := make(chan *job)
+func (p *poller) poll(interval time.Duration, quit <-chan bool) <-chan *Job {
+	jobs := make(chan *Job)
 
 	conn, err := GetConn()
 	if err != nil {

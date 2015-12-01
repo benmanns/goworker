@@ -1,11 +1,12 @@
 package goworker
 
 import (
-	"github.com/youtube/vitess/go/pools"
 	"errors"
-	"github.com/garyburd/redigo/redis"
 	"net/url"
 	"time"
+
+	"github.com/garyburd/redigo/redis"
+	"github.com/youtube/vitess/go/pools"
 )
 
 var (
