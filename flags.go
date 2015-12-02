@@ -113,7 +113,7 @@ func Namespace() string {
 }
 
 func init() {
-	flag.StringVar(&queuesString, "queues", "", "a comma-separated list of Resque queues")
+	flag.StringVar(&queuesString, "queues", os.Getenv("QUEUES"), "a comma-separated list of Resque queues [QUEUES]")
 
 	flag.Float64Var(&intervalFloat, "interval", 5.0, "sleep interval when no jobs are found")
 
