@@ -13,9 +13,10 @@ import (
 )
 
 var (
-	logger seelog.LoggerInterface
-	pool   *pools.ResourcePool
-	ctx    context.Context
+	logger      seelog.LoggerInterface
+	pool        *pools.ResourcePool
+	ctx         context.Context
+	initialized bool
 )
 
 // Init initializes the goworker process. This will be
@@ -35,6 +36,8 @@ func Init() error {
 	ctx = context.Background()
 
 	pool = newRedisPool(uri, connections, connections, time.Minute)
+
+	initialized = true
 
 	return nil
 }
@@ -83,11 +86,13 @@ func Close() {
 // received, or until the queues are empty if the
 // -exit-on-complete flag is set.
 func Work() error {
-	err := Init()
-	if err != nil {
-		return err
+	if !initialized {
+		err := Init()
+		if err != nil {
+			return err
+		}
+		defer Close()
 	}
-	defer Close()
 
 	quit := signals()
 
