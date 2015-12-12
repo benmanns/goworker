@@ -24,21 +24,22 @@ var (
 // that wish to access goworker functions and configuration
 // without actually processing jobs.
 func Init() error {
-	var err error
-	logger, err = seelog.LoggerFromWriterWithMinLevel(os.Stdout, seelog.InfoLvl)
-	if err != nil {
-		return err
+	if !initialized {
+		var err error
+		logger, err = seelog.LoggerFromWriterWithMinLevel(os.Stdout, seelog.InfoLvl)
+		if err != nil {
+			return err
+		}
+
+		if err := flags(); err != nil {
+			return err
+		}
+		ctx = context.Background()
+
+		pool = newRedisPool(uri, connections, connections, time.Minute)
+
+		initialized = true
 	}
-
-	if err := flags(); err != nil {
-		return err
-	}
-	ctx = context.Background()
-
-	pool = newRedisPool(uri, connections, connections, time.Minute)
-
-	initialized = true
-
 	return nil
 }
 
@@ -78,6 +79,7 @@ func PutConn(conn *RedisConn) {
 //	defer goworker.Close()
 func Close() {
 	pool.Close()
+	initialized = false
 }
 
 // Work starts the goworker process. Check for errors in
@@ -86,13 +88,11 @@ func Close() {
 // received, or until the queues are empty if the
 // -exit-on-complete flag is set.
 func Work() error {
-	if !initialized {
-		err := Init()
-		if err != nil {
-			return err
-		}
-		defer Close()
+	err := Init()
+	if err != nil {
+		return err
 	}
+	defer Close()
 
 	quit := signals()
 

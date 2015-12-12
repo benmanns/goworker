@@ -22,10 +22,11 @@ func Register(class string, worker workerFunc) {
 }
 
 func Enqueue(job *Job) error {
-	if !initialized {
-		Init()
-		defer Close()
+	err := Init()
+	if err != nil {
+		return err
 	}
+
 	conn, err := GetConn()
 	if err != nil {
 		logger.Criticalf("Error on getting connection on enqueue")
