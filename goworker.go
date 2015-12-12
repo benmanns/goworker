@@ -13,9 +13,10 @@ import (
 )
 
 var (
-	logger seelog.LoggerInterface
-	pool   *pools.ResourcePool
-	ctx    context.Context
+	logger      seelog.LoggerInterface
+	pool        *pools.ResourcePool
+	ctx         context.Context
+	initialized bool
 )
 
 // Init initializes the goworker process. This will be
@@ -23,19 +24,22 @@ var (
 // that wish to access goworker functions and configuration
 // without actually processing jobs.
 func Init() error {
-	var err error
-	logger, err = seelog.LoggerFromWriterWithMinLevel(os.Stdout, seelog.InfoLvl)
-	if err != nil {
-		return err
+	if !initialized {
+		var err error
+		logger, err = seelog.LoggerFromWriterWithMinLevel(os.Stdout, seelog.InfoLvl)
+		if err != nil {
+			return err
+		}
+
+		if err := flags(); err != nil {
+			return err
+		}
+		ctx = context.Background()
+
+		pool = newRedisPool(uri, connections, connections, time.Minute)
+
+		initialized = true
 	}
-
-	if err := flags(); err != nil {
-		return err
-	}
-	ctx = context.Background()
-
-	pool = newRedisPool(uri, connections, connections, time.Minute)
-
 	return nil
 }
 
@@ -75,6 +79,7 @@ func PutConn(conn *RedisConn) {
 //	defer goworker.Close()
 func Close() {
 	pool.Close()
+	initialized = false
 }
 
 // Work starts the goworker process. Check for errors in
