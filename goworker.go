@@ -16,6 +16,7 @@ var (
 	logger      seelog.LoggerInterface
 	pool        *pools.ResourcePool
 	ctx         context.Context
+	initMutex   sync.Mutex
 	initialized bool
 )
 
@@ -24,6 +25,8 @@ var (
 // that wish to access goworker functions and configuration
 // without actually processing jobs.
 func Init() error {
+	initMutex.Lock()
+	defer initMutex.Unlock()
 	if !initialized {
 		var err error
 		logger, err = seelog.LoggerFromWriterWithMinLevel(os.Stdout, seelog.InfoLvl)
@@ -78,8 +81,12 @@ func PutConn(conn *RedisConn) {
 //	}
 //	defer goworker.Close()
 func Close() {
-	pool.Close()
-	initialized = false
+	initMutex.Lock()
+	defer initMutex.Unlock()
+	if initialized {
+		pool.Close()
+		initialized = false
+	}
 }
 
 // Work starts the goworker process. Check for errors in
