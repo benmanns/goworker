@@ -156,7 +156,7 @@ func flags() error {
 		logger.Warn("== DEPRECATION WARNING ==")
 		logger.Warn("  Currently, encoding/json decodes numbers as float64.")
 		logger.Warn("  This can cause numbers to lose precision as they are read from the Resque queue.")
-		logger.Warn("  Set the -use-numbers flag to use json.Number when decoding numbers and remove this warning.")
+		logger.Warn("  Set the -use-number flag to use json.Number when decoding numbers and remove this warning.")
 	}
 
 	return nil
