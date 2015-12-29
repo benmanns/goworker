@@ -46,6 +46,10 @@ func Init() error {
 	return nil
 }
 
+func GetLogger() seelog.LoggerInterface {
+	return logger
+}
+
 // GetConn returns a connection from the goworker Redis
 // connection pool. When using the pool, check in
 // connections as quickly as possible, because holding a
