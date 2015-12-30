@@ -16,9 +16,13 @@ type process struct {
 }
 
 func newProcess(id string, queues []string) (*process, error) {
-	hostname, err := os.Hostname()
-	if err != nil {
-		return nil, err
+	if hostname == "" {
+		h, err := os.Hostname()
+		if err != nil {
+			return nil, err
+		}
+
+		hostname = h
 	}
 
 	return &process{
