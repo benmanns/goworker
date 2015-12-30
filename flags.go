@@ -103,6 +103,7 @@ var (
 	exitOnComplete bool
 	isStrict       bool
 	useNumber      bool
+	hostname       string
 )
 
 // Namespace returns the namespace flag for goworker. You
@@ -138,6 +139,9 @@ func init() {
 	flag.BoolVar(&exitOnComplete, "exit-on-complete", false, "exit when the queue is empty")
 
 	flag.BoolVar(&useNumber, "use-number", false, "use json.Number instead of float64 when decoding numbers in JSON. will default to true soon")
+
+	hostname = os.Getenv("HOSTNAME")
+	flag.StringVar(&hostname, "hostname", hostname, "custom hostname for resque workers")
 }
 
 func flags() error {
