@@ -37,9 +37,7 @@ func (p *process) open(conn *RedisConn) error {
 	conn.Send("SADD", fmt.Sprintf("%sworkers", namespace), p)
 	conn.Send("SET", fmt.Sprintf("%sstat:processed:%v", namespace, p), "0")
 	conn.Send("SET", fmt.Sprintf("%sstat:failed:%v", namespace, p), "0")
-	conn.Flush()
-
-	return nil
+	return conn.Flush()
 }
 
 func (p *process) close(conn *RedisConn) error {
@@ -47,32 +45,24 @@ func (p *process) close(conn *RedisConn) error {
 	conn.Send("SREM", fmt.Sprintf("%sworkers", namespace), p)
 	conn.Send("DEL", fmt.Sprintf("%sstat:processed:%s", namespace, p))
 	conn.Send("DEL", fmt.Sprintf("%sstat:failed:%s", namespace, p))
-	conn.Flush()
-
-	return nil
+	return conn.Flush()
 }
 
 func (p *process) start(conn *RedisConn) error {
 	conn.Send("SET", fmt.Sprintf("%sworker:%s:started", namespace, p), time.Now().String())
-	conn.Flush()
-
-	return nil
+	return conn.Flush()
 }
 
 func (p *process) finish(conn *RedisConn) error {
 	conn.Send("DEL", fmt.Sprintf("%sworker:%s", namespace, p))
 	conn.Send("DEL", fmt.Sprintf("%sworker:%s:started", namespace, p))
-	conn.Flush()
-
-	return nil
+	return conn.Flush()
 }
 
 func (p *process) fail(conn *RedisConn) error {
 	conn.Send("INCR", fmt.Sprintf("%sstat:failed", namespace))
 	conn.Send("INCR", fmt.Sprintf("%sstat:failed:%s", namespace, p))
-	conn.Flush()
-
-	return nil
+	return conn.Flush()
 }
 
 func (p *process) queues(strict bool) []string {
