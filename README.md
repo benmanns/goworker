@@ -105,10 +105,15 @@ func myFunc(queue string, args ...interface{}) error {
 }
 
 func init() {
-	var workerSettings goworker.WorkerSettings{
-		Uri: "redis://localhost:6379/",
-		Connections: 100,
-		Queues: []string{"comma","delimited","queues"},
+	settings := goworker.WorkerSettings{
+		Uri:            "redis://localhost:6379/",
+		Connections:    100,
+		Queues:         []string{"myqueue", "delimited", "queues"},
+		UseNumber:      true,
+		ExitOnComplete: false,
+		Concurrency:    2,
+		Namespace:      "resque:",
+		Interval:       5.0,
 	}
 	goworker.SetSettings(workerSettings)
 	goworker.Register("MyClass", myFunc)
