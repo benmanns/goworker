@@ -89,6 +89,43 @@ func main() {
 }
 ```
 
+Here is a simple worker with settings:
+
+```go
+package main
+
+import (
+	"fmt"
+	"github.com/benmanns/goworker"
+)
+
+func myFunc(queue string, args ...interface{}) error {
+	fmt.Printf("From %s, %v\n", queue, args)
+	return nil
+}
+
+func init() {
+	settings := goworker.WorkerSettings{
+		Uri:            "redis://localhost:6379/",
+		Connections:    100,
+		Queues:         []string{"myqueue", "delimited", "queues"},
+		UseNumber:      true,
+		ExitOnComplete: false,
+		Concurrency:    2,
+		Namespace:      "resque:",
+		Interval:       5.0,
+	}
+	goworker.SetSettings(workerSettings)
+	goworker.Register("MyClass", myFunc)
+}
+
+func main() {
+	if err := goworker.Work(); err != nil {
+		fmt.Println("Error:", err)
+	}
+}
+```
+
 goworker worker functions receive the queue they are serving and a slice of interfaces. To use them as parameters to other functions, use Go type assertions to convert them into usable types.
 
 ```go
