@@ -132,10 +132,10 @@ func flags() error {
 	if !flag.Parsed() {
 		flag.Parse()
 	}
-	if err := workerSettings.Queues.Set(workerSettings.QueuesString); err != nil {
+	if err := workerSettings.queues.Set(workerSettings.QueuesString); err != nil {
 		return err
 	}
-	if err := workerSettings.Interval.SetFloat(workerSettings.IntervalFloat); err != nil {
+	if err := workerSettings.interval.SetFloat(workerSettings.IntervalFloat); err != nil {
 		return err
 	}
 	workerSettings.IsStrict = strings.IndexRune(workerSettings.QueuesString, '=') == -1

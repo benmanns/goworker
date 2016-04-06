@@ -108,12 +108,12 @@ func init() {
 	settings := goworker.WorkerSettings{
 		Uri:            "redis://localhost:6379/",
 		Connections:    100,
-		Queues:         []string{"myqueue", "delimited", "queues"},
+		QueuesString:   "myqueue, delimited, queues",
 		UseNumber:      true,
 		ExitOnComplete: false,
 		Concurrency:    2,
 		Namespace:      "resque:",
-		Interval:       5.0,
+		IntervalFloat:       5.0,
 	}
 	goworker.SetSettings(workerSettings)
 	goworker.Register("MyClass", myFunc)
