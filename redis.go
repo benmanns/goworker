@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/garyburd/redigo/redis"
-	"github.com/youtube/vitess/go/pools"
+	"github.com/sillydong/vitess/go/pools"
 )
 
 var (

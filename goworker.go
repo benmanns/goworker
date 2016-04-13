@@ -8,7 +8,7 @@ import (
 
 	"github.com/cihub/seelog"
 	"github.com/golang/net/context"
-	"github.com/youtube/vitess/go/pools"
+	"github.com/sillydong/vitess/go/pools"
 )
 
 var (
