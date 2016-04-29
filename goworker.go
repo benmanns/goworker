@@ -6,8 +6,9 @@ import (
 	"sync"
 	"time"
 
+	"golang.org/x/net/context"
+
 	"github.com/cihub/seelog"
-	"github.com/golang/net/context"
 	"github.com/youtube/vitess/go/pools"
 )
 
