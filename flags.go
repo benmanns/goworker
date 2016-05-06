@@ -102,7 +102,7 @@ var (
 	namespace      string
 	exitOnComplete bool
 	isStrict       bool
-	useNumber      bool
+	UseNumber      bool
 )
 
 // Namespace returns the namespace flag for goworker. You
@@ -137,7 +137,7 @@ func init() {
 
 	flag.BoolVar(&exitOnComplete, "exit-on-complete", false, "exit when the queue is empty")
 
-	flag.BoolVar(&useNumber, "use-number", false, "use json.Number instead of float64 when decoding numbers in JSON. will default to true soon")
+	flag.BoolVar(&UseNumber, "use-number", false, "use json.Number instead of float64 when decoding numbers in JSON. will default to true soon")
 }
 
 func flags() error {
@@ -152,7 +152,7 @@ func flags() error {
 	}
 	isStrict = strings.IndexRune(QueuesString, '=') == -1
 
-	if !useNumber {
+	if !UseNumber {
 		logger.Warn("== DEPRECATION WARNING ==")
 		logger.Warn("  Currently, encoding/json decodes numbers as float64.")
 		logger.Warn("  This can cause numbers to lose precision as they are read from the Resque queue.")
