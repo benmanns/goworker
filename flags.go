@@ -31,16 +31,16 @@
 // no job was in the queue the last time one was
 // requested.
 //
-// -concurrency=25
+// -Concurrency=25
 // — Specifies the number of concurrently
 // executing workers. This number can be as low
 // as 1 or rather comfortably as high as 100,000,
 // and should be tuned to your workflow and the
 // availability of outside resources.
 //
-// -connections=2
+// -Connections=2
 // — Specifies the maximum number of Redis
-// connections that goworker will consume between
+// Connections that goworker will consume between
 // the poller and all workers. There is not much
 // performance gain over two and a slight penalty
 // when using only one. This is configurable in
@@ -94,15 +94,15 @@ import (
 var (
 	queuesString   string
 	queues         queuesFlag
-	intervalFloat  float64
+	IntervalFloat  float64
 	interval       intervalFlag
-	concurrency    int
-	connections    int
-	uri            string
+	Concurrency    int
+	Connections    int
+	RedisUri            string
 	namespace      string
 	exitOnComplete bool
 	isStrict       bool
-	useNumber      bool
+	UseNumber      bool
 )
 
 // Namespace returns the namespace flag for goworker. You
@@ -115,11 +115,11 @@ func Namespace() string {
 func init() {
 	flag.StringVar(&queuesString, "queues", "", "a comma-separated list of Resque queues")
 
-	flag.Float64Var(&intervalFloat, "interval", 5.0, "sleep interval when no jobs are found")
+	flag.Float64Var(&IntervalFloat, "interval", 5.0, "sleep interval when no jobs are found")
 
-	flag.IntVar(&concurrency, "concurrency", 25, "the maximum number of concurrently executing jobs")
+	flag.IntVar(&Concurrency, "concurrency", 25, "the maximum number of concurrently executing jobs")
 
-	flag.IntVar(&connections, "connections", 2, "the maximum number of connections to the Redis database")
+	flag.IntVar(&Connections, "connections", 2, "the maximum number of Connections to the Redis database")
 
 	redisProvider := os.Getenv("REDIS_PROVIDER")
 	var redisEnvUri string
@@ -131,13 +131,13 @@ func init() {
 	if redisEnvUri == "" {
 		redisEnvUri = "redis://localhost:6379/"
 	}
-	flag.StringVar(&uri, "uri", redisEnvUri, "the URI of the Redis server")
+	flag.StringVar(&RedisUri, "uri", redisEnvUri, "the URI of the Redis server")
 
 	flag.StringVar(&namespace, "namespace", "resque:", "the Redis namespace")
 
 	flag.BoolVar(&exitOnComplete, "exit-on-complete", false, "exit when the queue is empty")
 
-	flag.BoolVar(&useNumber, "use-number", false, "use json.Number instead of float64 when decoding numbers in JSON. will default to true soon")
+	flag.BoolVar(&UseNumber, "use-number", false, "use json.Number instead of float64 when decoding numbers in JSON. will default to true soon")
 }
 
 func flags() error {
@@ -147,12 +147,12 @@ func flags() error {
 	if err := queues.Set(queuesString); err != nil {
 		return err
 	}
-	if err := interval.SetFloat(intervalFloat); err != nil {
+	if err := interval.SetFloat(IntervalFloat); err != nil {
 		return err
 	}
 	isStrict = strings.IndexRune(queuesString, '=') == -1
 
-	if !useNumber {
+	if !UseNumber {
 		logger.Warn("== DEPRECATION WARNING ==")
 		logger.Warn("  Currently, encoding/json decodes numbers as float64.")
 		logger.Warn("  This can cause numbers to lose precision as they are read from the Resque queue.")

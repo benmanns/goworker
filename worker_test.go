@@ -52,7 +52,7 @@ func TestEnqueue(t *testing.T) {
 	}
 
 	queues = []string{queueName}
-	useNumber = true
+	UseNumber = true
 	exitOnComplete = true
 
 	err := Enqueue(expectedJob)
