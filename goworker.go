@@ -13,7 +13,7 @@ import (
 )
 
 var (
-	logger      seelog.LoggerInterface
+	Logger      seelog.LoggerInterface
 	pool        *pools.ResourcePool
 	ctx         context.Context
 	initMutex   sync.Mutex
@@ -29,7 +29,7 @@ func Init() error {
 	defer initMutex.Unlock()
 	if !initialized {
 		var err error
-		logger, err = seelog.LoggerFromWriterWithMinLevel(os.Stdout, seelog.InfoLvl)
+		Logger, err = seelog.LoggerFromWriterWithMinLevel(os.Stdout, seelog.InfoLvl)
 		if err != nil {
 			return err
 		}
@@ -39,7 +39,7 @@ func Init() error {
 		}
 		ctx = context.Background()
 
-		pool = newRedisPool(uri, connections, connections, time.Minute)
+		pool = newRedisPool(RedisUri, Connections, Connections, time.Minute)
 
 		initialized = true
 	}
@@ -48,7 +48,7 @@ func Init() error {
 
 // GetConn returns a connection from the goworker Redis
 // connection pool. When using the pool, check in
-// connections as quickly as possible, because holding a
+// Connections as quickly as possible, because holding a
 // connection will cause concurrent worker functions to lock
 // while they wait for an available connection. Expect this
 // API to change drastically.
@@ -111,7 +111,7 @@ func Work() error {
 
 	var monitor sync.WaitGroup
 
-	for id := 0; id < concurrency; id++ {
+	for id := 0; id < Concurrency; id++ {
 		worker, err := newWorker(strconv.Itoa(id), queues)
 		if err != nil {
 			return err
