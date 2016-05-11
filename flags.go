@@ -153,10 +153,10 @@ func flags() error {
 	isStrict = strings.IndexRune(QueuesString, '=') == -1
 
 	if !UseNumber {
-		logger.Warn("== DEPRECATION WARNING ==")
-		logger.Warn("  Currently, encoding/json decodes numbers as float64.")
-		logger.Warn("  This can cause numbers to lose precision as they are read from the Resque queue.")
-		logger.Warn("  Set the -use-number flag to use json.Number when decoding numbers and remove this warning.")
+		Logger.Warn("== DEPRECATION WARNING ==")
+		Logger.Warn("  Currently, encoding/json decodes numbers as float64.")
+		Logger.Warn("  This can cause numbers to lose precision as they are read from the Resque queue.")
+		Logger.Warn("  Set the -use-number flag to use json.Number when decoding numbers and remove this warning.")
 	}
 
 	return nil

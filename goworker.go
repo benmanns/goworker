@@ -13,7 +13,7 @@ import (
 )
 
 var (
-	logger      seelog.LoggerInterface
+	Logger      seelog.LoggerInterface
 	pool        *pools.ResourcePool
 	ctx         context.Context
 	initMutex   sync.Mutex
@@ -29,7 +29,7 @@ func Init() error {
 	defer initMutex.Unlock()
 	if !initialized {
 		var err error
-		logger, err = seelog.LoggerFromWriterWithMinLevel(os.Stdout, seelog.InfoLvl)
+		Logger, err = seelog.LoggerFromWriterWithMinLevel(os.Stdout, seelog.InfoLvl)
 		if err != nil {
 			return err
 		}
