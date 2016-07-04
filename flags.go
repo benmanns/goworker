@@ -108,16 +108,16 @@ func init() {
 	flag.IntVar(&workerSettings.Connections, "connections", 2, "the maximum number of connections to the Redis database")
 
 	redisProvider := os.Getenv("REDIS_PROVIDER")
-	var redisEnvUri string
+	var redisEnvURI string
 	if redisProvider != "" {
-		redisEnvUri = os.Getenv(redisProvider)
+		redisEnvURI = os.Getenv(redisProvider)
 	} else {
-		redisEnvUri = os.Getenv("REDIS_URL")
+		redisEnvURI = os.Getenv("REDIS_URL")
 	}
-	if redisEnvUri == "" {
-		redisEnvUri = "redis://localhost:6379/"
+	if redisEnvURI == "" {
+		redisEnvURI = "redis://localhost:6379/"
 	}
-	flag.StringVar(&workerSettings.URI, "uri", redisEnvUri, "the URI of the Redis server")
+	flag.StringVar(&workerSettings.URI, "uri", redisEnvURI, "the URI of the Redis server")
 
 	flag.StringVar(&workerSettings.Namespace, "namespace", "resque:", "the Redis namespace")
 
