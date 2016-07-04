@@ -27,7 +27,7 @@ func (p *poller) getJob(conn *RedisConn) (*Job, error) {
 	for _, queue := range p.queues(p.isStrict) {
 		logger.Debugf("Checking %s", queue)
 
-		reply, err := conn.Do("LPOP", fmt.Sprintf("%squeue:%s", namespace, queue))
+		reply, err := conn.Do("LPOP", fmt.Sprintf("%squeue:%s", workerSettings.Namespace, queue))
 		if err != nil {
 			return nil, err
 		}
@@ -37,7 +37,7 @@ func (p *poller) getJob(conn *RedisConn) (*Job, error) {
 			job := &Job{Queue: queue}
 
 			decoder := json.NewDecoder(bytes.NewReader(reply.([]byte)))
-			if useNumber {
+			if workerSettings.UseNumber {
 				decoder.UseNumber()
 			}
 
@@ -98,7 +98,7 @@ func (p *poller) poll(interval time.Duration, quit <-chan bool) <-chan *Job {
 					return
 				}
 				if job != nil {
-					conn.Send("INCR", fmt.Sprintf("%sstat:processed:%v", namespace, p))
+					conn.Send("INCR", fmt.Sprintf("%sstat:processed:%v", workerSettings.Namespace, p))
 					conn.Flush()
 					PutConn(conn)
 					select {
@@ -115,13 +115,13 @@ func (p *poller) poll(interval time.Duration, quit <-chan bool) <-chan *Job {
 							return
 						}
 
-						conn.Send("LPUSH", fmt.Sprintf("%squeue:%s", namespace, job.Queue), buf)
+						conn.Send("LPUSH", fmt.Sprintf("%squeue:%s", workerSettings.Namespace, job.Queue), buf)
 						conn.Flush()
 						return
 					}
 				} else {
 					PutConn(conn)
-					if exitOnComplete {
+					if workerSettings.ExitOnComplete {
 						return
 					}
 					logger.Debugf("Sleeping for %v", interval)

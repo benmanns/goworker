@@ -51,9 +51,9 @@ func TestEnqueue(t *testing.T) {
 		},
 	}
 
-	queues = []string{queueName}
-	useNumber = true
-	exitOnComplete = true
+	workerSettings.Queues = []string{queueName}
+	workerSettings.UseNumber = true
+	workerSettings.ExitOnComplete = true
 
 	err := Enqueue(expectedJob)
 	if err != nil {
