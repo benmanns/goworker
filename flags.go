@@ -117,7 +117,7 @@ func init() {
 	if redisEnvUri == "" {
 		redisEnvUri = "redis://localhost:6379/"
 	}
-	flag.StringVar(&workerSettings.Uri, "uri", redisEnvUri, "the URI of the Redis server")
+	flag.StringVar(&workerSettings.URI, "uri", redisEnvUri, "the URI of the Redis server")
 
 	flag.StringVar(&workerSettings.Namespace, "namespace", "resque:", "the Redis namespace")
 

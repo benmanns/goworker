@@ -106,7 +106,7 @@ func myFunc(queue string, args ...interface{}) error {
 
 func init() {
 	settings := goworker.WorkerSettings{
-		Uri:            "redis://localhost:6379/",
+		URI:            "redis://localhost:6379/",
 		Connections:    100,
 		Queues:         []string{"myqueue", "delimited", "queues"},
 		UseNumber:      true,

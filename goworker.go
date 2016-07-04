@@ -29,7 +29,7 @@ type WorkerSettings struct {
 	Interval       intervalFlag
 	Concurrency    int
 	Connections    int
-	Uri            string
+	URI            string
 	Namespace      string
 	ExitOnComplete bool
 	IsStrict       bool
@@ -59,7 +59,7 @@ func Init() error {
 		}
 		ctx = context.Background()
 
-		pool = newRedisPool(workerSettings.Uri, workerSettings.Connections, workerSettings.Connections, time.Minute)
+		pool = newRedisPool(workerSettings.URI, workerSettings.Connections, workerSettings.Connections, time.Minute)
 
 		initialized = true
 	}
