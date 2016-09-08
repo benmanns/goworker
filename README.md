@@ -174,6 +174,18 @@ end
 end
 ```
 
+or
+
+```golang
+goworker.Enqueue(&goworker.Job{
+    Queue: "myqueue",
+    Payload: goworker.Payload{
+        Class: "MyClass",
+        Args: []interface{}{"hi", "there"},
+    },
+})
+```
+
 ## Flags
 
 There are several flags which control the operation of the goworker client.
