@@ -115,7 +115,7 @@ func init() {
 		Namespace:      "resque:",
 		Interval:       5.0,
 	}
-	goworker.SetSettings(workerSettings)
+	goworker.SetSettings(settings)
 	goworker.Register("MyClass", myFunc)
 }
 
