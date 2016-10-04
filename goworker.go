@@ -20,6 +20,26 @@ var (
 	initialized bool
 )
 
+var workerSettings WorkerSettings
+
+type WorkerSettings struct {
+	QueuesString   string
+	Queues         queuesFlag
+	IntervalFloat  float64
+	Interval       intervalFlag
+	Concurrency    int
+	Connections    int
+	URI            string
+	Namespace      string
+	ExitOnComplete bool
+	IsStrict       bool
+	UseNumber      bool
+}
+
+func SetSettings(settings WorkerSettings) {
+	workerSettings = settings
+}
+
 // Init initializes the goworker process. This will be
 // called by the Work function, but may be used by programs
 // that wish to access goworker functions and configuration
@@ -39,7 +59,7 @@ func Init() error {
 		}
 		ctx = context.Background()
 
-		pool = newRedisPool(uri, connections, connections, time.Minute)
+		pool = newRedisPool(workerSettings.URI, workerSettings.Connections, workerSettings.Connections, time.Minute)
 
 		initialized = true
 	}
@@ -103,16 +123,16 @@ func Work() error {
 
 	quit := signals()
 
-	poller, err := newPoller(queues, isStrict)
+	poller, err := newPoller(workerSettings.Queues, workerSettings.IsStrict)
 	if err != nil {
 		return err
 	}
-	jobs := poller.poll(time.Duration(interval), quit)
+	jobs := poller.poll(time.Duration(workerSettings.Interval), quit)
 
 	var monitor sync.WaitGroup
 
-	for id := 0; id < concurrency; id++ {
-		worker, err := newWorker(strconv.Itoa(id), queues)
+	for id := 0; id < workerSettings.Concurrency; id++ {
+		worker, err := newWorker(strconv.Itoa(id), workerSettings.Queues)
 		if err != nil {
 			return err
 		}

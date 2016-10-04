@@ -39,7 +39,7 @@ func Enqueue(job *Job) error {
 		logger.Criticalf("Cant marshal payload on enqueue")
 		return err
 	}
-	err = conn.Send("RPUSH", fmt.Sprintf("%squeue:%s", namespace, job.Queue), buffer)
+	err = conn.Send("RPUSH", fmt.Sprintf("%squeue:%s", workerSettings.Namespace, job.Queue), buffer)
 	if err != nil {
 		logger.Criticalf("Cant push to queue")
 		return err
