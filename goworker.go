@@ -1,6 +1,8 @@
 package goworker
 
 import (
+	"github.com/youtube/vitess/go/pools"
+	"github.com/cihub/seelog"
 	"os"
 	"strconv"
 	"sync"
