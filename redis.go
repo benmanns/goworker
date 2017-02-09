@@ -1,6 +1,7 @@
 package goworker
 
 import (
+	"github.com/youtube/vitess/go/pools"
 	"errors"
 	"net/url"
 	"time"
