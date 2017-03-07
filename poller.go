@@ -117,6 +117,7 @@ func (p *poller) poll(interval time.Duration, quit <-chan bool) <-chan *Job {
 
 						conn.Send("LPUSH", fmt.Sprintf("%squeue:%s", workerSettings.Namespace, job.Queue), buf)
 						conn.Flush()
+						PutConn(conn)
 						return
 					}
 				} else {
