@@ -187,6 +187,43 @@ goworker.Enqueue(&goworker.Job{
 })
 ```
 
+## Redis Settings
+
+Rather than specify a full URI, you may use the `RedisSettings` struct to specify more granular options for the Redis connection.
+
+```go
+func init() {
+	redisSettings := goworker.RedisSettings {
+		DB:       "2",
+		Host:     "localhost:6379",
+		Scheme:   "redis",
+		Password: "Foobar"
+	}
+	settings := goworker.WorkerSettings{
+		Connections:    100,
+		Queues:         []string{"myqueue", "delimited", "queues"},
+		UseNumber:      true,
+		ExitOnComplete: false,
+		Concurrency:    2,
+		Namespace:      "resque:",
+		RedisSettings:  redisSettings,
+	}
+	goworker.SetSettings(settings)
+	goworker.Register("MyClass", myFunc)
+}
+```
+
+Goworker uses these options to support [Redis Sentinel](https://redis.io/topics/sentinel). Here is an example of RedisSettings that work with Redis Sentinel:
+
+```go
+	redisSettings := goworker.RedisSettings {
+		MasterName: "example-test",
+		Sentinels:  []string{"localhost:26379", "localhost:26380"},
+		Timeout:    time.Second,
+	}
+}
+```
+
 ## Flags
 
 There are several flags which control the operation of the goworker client.

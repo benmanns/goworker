@@ -5,12 +5,18 @@ import (
 	"net/url"
 	"time"
 
+	"github.com/FZambia/go-sentinel"
 	"github.com/garyburd/redigo/redis"
 	"github.com/youtube/vitess/go/pools"
 )
 
 var (
 	errorInvalidScheme = errors.New("invalid Redis database URI scheme")
+	schemeMap          = map[string]string{
+		"":      "tcp",
+		"redis": "tcp",
+		"unix":  "unix",
+	}
 )
 
 type RedisConn struct {
@@ -21,59 +27,69 @@ func (r *RedisConn) Close() {
 	_ = r.Conn.Close()
 }
 
-func newRedisFactory(uri string) pools.Factory {
+func newRedisFactory(settings RedisSettings) pools.Factory {
 	return func() (pools.Resource, error) {
-		return redisConnFromURI(uri)
+		return redisConnFromSettings(settings)
 	}
 }
 
-func newRedisPool(uri string, capacity int, maxCapacity int, idleTimout time.Duration) *pools.ResourcePool {
-	return pools.NewResourcePool(newRedisFactory(uri), capacity, maxCapacity, idleTimout)
+func newRedisPool(settings RedisSettings, capacity int, maxCapacity int, idleTimout time.Duration) *pools.ResourcePool {
+	return pools.NewResourcePool(newRedisFactory(settings), capacity, maxCapacity, idleTimout)
 }
 
-func redisConnFromURI(uriString string) (*RedisConn, error) {
-	uri, err := url.Parse(uriString)
+func parseSettingsURI(settings *RedisSettings) error {
+	uri, err := url.Parse(settings.URI)
 	if err != nil {
-		return nil, err
+		return err
 	}
+	settings.Scheme = uri.Scheme
 
-	var network string
-	var host string
-	var password string
-	var db string
-
-	switch uri.Scheme {
+	switch settings.Scheme {
 	case "redis":
-		network = "tcp"
-		host = uri.Host
+		settings.Host = uri.Host
 		if uri.User != nil {
-			password, _ = uri.User.Password()
+			settings.Password, _ = uri.User.Password()
 		}
 		if len(uri.Path) > 1 {
-			db = uri.Path[1:]
+			settings.DB = uri.Path[1:]
 		}
 	case "unix":
-		network = "unix"
-		host = uri.Path
+		settings.Host = uri.Path
 	default:
-		return nil, errorInvalidScheme
+		return errorInvalidScheme
+	}
+	return nil
+}
+
+func redisConnFromSettings(settings RedisSettings) (*RedisConn, error) {
+	var err error
+	var conn redis.Conn
+	if settings.URI != "" {
+		err = parseSettingsURI(&settings)
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	conn, err := redis.Dial(network, host)
+	if settings.MasterName == "" {
+		conn, err = redis.Dial(schemeMap[settings.Scheme], settings.Host)
+	} else {
+		conn, err = redisSentinelConnection(settings)
+	}
 	if err != nil {
 		return nil, err
 	}
 
-	if password != "" {
-		_, err := conn.Do("AUTH", password)
+	if settings.Password != "" {
+		_, err := conn.Do("AUTH", settings.Password)
 		if err != nil {
 			conn.Close()
 			return nil, err
 		}
 	}
 
-	if db != "" {
-		_, err := conn.Do("SELECT", db)
+	if settings.DB != "" {
+		_, err := conn.Do("SELECT", settings.DB)
 		if err != nil {
 			conn.Close()
 			return nil, err
@@ -81,4 +97,29 @@ func redisConnFromURI(uriString string) (*RedisConn, error) {
 	}
 
 	return &RedisConn{Conn: conn}, nil
+}
+
+func redisSentinelConnection(settings RedisSettings) (redis.Conn, error) {
+	sntnl := &sentinel.Sentinel{
+		Addrs:      settings.Sentinels,
+		MasterName: settings.MasterName,
+		Dial: func(addr string) (redis.Conn, error) {
+			timeout := settings.Timeout
+			return redis.DialTimeout(schemeMap[settings.Scheme], addr, timeout, timeout, timeout)
+		},
+	}
+	pool := &redis.Pool{
+		Wait:        true,
+		IdleTimeout: time.Second,
+		Dial: func() (redis.Conn, error) {
+
+			masterAddr, err := sntnl.MasterAddr()
+			if err != nil {
+				return nil, err
+			}
+			return redis.Dial(schemeMap[settings.Scheme], masterAddr)
+		},
+	}
+
+	return pool.Dial()
 }

@@ -34,10 +34,22 @@ type WorkerSettings struct {
 	ExitOnComplete bool
 	IsStrict       bool
 	UseNumber      bool
+	RedisSettings  RedisSettings
 }
 
 func SetSettings(settings WorkerSettings) {
 	workerSettings = settings
+}
+
+type RedisSettings struct {
+	URI        string
+	Host       string
+	DB         string
+	Scheme     string
+	MasterName string
+	Sentinels  []string
+	Timeout    time.Duration
+	Password   string
 }
 
 // Init initializes the goworker process. This will be
@@ -58,8 +70,10 @@ func Init() error {
 			return err
 		}
 		ctx = context.Background()
-
-		pool = newRedisPool(workerSettings.URI, workerSettings.Connections, workerSettings.Connections, time.Minute)
+		if workerSettings.URI != "" {
+			workerSettings.RedisSettings.URI = workerSettings.URI
+		}
+		pool = newRedisPool(workerSettings.RedisSettings, workerSettings.Connections, workerSettings.Connections, time.Minute)
 
 		initialized = true
 	}
