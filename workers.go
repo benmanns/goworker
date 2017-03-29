@@ -39,9 +39,16 @@ func Enqueue(job *Job) error {
 		logger.Criticalf("Cant marshal payload on enqueue")
 		return err
 	}
+
 	err = conn.Send("RPUSH", fmt.Sprintf("%squeue:%s", workerSettings.Namespace, job.Queue), buffer)
 	if err != nil {
 		logger.Criticalf("Cant push to queue")
+		return err
+	}
+
+	err = conn.Send("SADD", fmt.Sprintf("%squeues", workerSettings.Namespace), job.Queue)
+	if err != nil {
+		logger.Criticalf("Cant register queue to list of use queues")
 		return err
 	}
 
