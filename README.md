@@ -1,6 +1,7 @@
 # goworker
 
 [![Build Status](https://travis-ci.org/benmanns/goworker.png?branch=master)](https://travis-ci.org/benmanns/goworker)
+[![GoDoc](https://godoc.org/github.com/benmanns/goworker?status.svg)](https://godoc.org/github.com/benmanns/goworker)
 
 goworker is a Resque-compatible, Go-based background worker. It allows you to push jobs into a queue using an expressive language like Ruby while harnessing the efficiency and concurrency of Go to minimize job latency and cost.
 
