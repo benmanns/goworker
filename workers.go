@@ -48,7 +48,7 @@ func Enqueue(job *Job) error {
 
 	err = conn.Send("SADD", fmt.Sprintf("%squeues", workerSettings.Namespace), job.Queue)
 	if err != nil {
-		logger.Criticalf("Cant regiser queue to list of use queues")
+		logger.Criticalf("Cant register queue to list of use queues")
 		return err
 	}
 
