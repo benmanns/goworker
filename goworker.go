@@ -1,6 +1,8 @@
 package goworker
 
 import (
+	"code.google.com/p/vitess/go/pools"
+	"github.com/cihub/seelog"
 	"os"
 	"strconv"
 	"sync"
@@ -64,6 +66,10 @@ func Init() error {
 		initialized = true
 	}
 	return nil
+}
+
+func GetLogger() seelog.LoggerInterface {
+	return logger
 }
 
 // GetConn returns a connection from the goworker Redis

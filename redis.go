@@ -1,6 +1,7 @@
 package goworker
 
 import (
+	"code.google.com/p/vitess/go/pools"
 	"errors"
 	"net/url"
 	"time"
@@ -11,6 +12,13 @@ import (
 
 var (
 	errorInvalidScheme = errors.New("invalid Redis database URI scheme")
+	deferredCommand    = redis.NewScript(1, `
+	local v = redis.call('ZRANGE', KEYS[1], 0, 0, 'WITHSCORES')
+	if v[2] and tonumber(v[2]) < tonumber(ARGV[1]) then
+		redis.call('ZREMRANGEBYRANK', KEYS[1], 0, 0)
+		return v[1]
+	end
+	return nil`)
 )
 
 type RedisConn struct {

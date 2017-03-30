@@ -1,6 +1,7 @@
 package goworker
 
-type Payload struct {
+type Deferred struct {
+	Queue string      `json:"queue"`
 	Class string      `json:"class"`
 	Args  interface{} `json:"args"`
 }
