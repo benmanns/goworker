@@ -123,6 +123,8 @@ func init() {
 
 	flag.BoolVar(&workerSettings.ExitOnComplete, "exit-on-complete", false, "exit when the queue is empty")
 
+	flag.StringVar(&workerSettings.Hostname, "hostname", os.Getenv("HOSTNAME"), "custom hostname for resque workers")
+
 	flag.BoolVar(&workerSettings.UseNumber, "use-number", false, "use json.Number instead of float64 when decoding numbers in JSON. will default to true soon")
 }
 
@@ -130,10 +132,10 @@ func flags() error {
 	if !flag.Parsed() {
 		flag.Parse()
 	}
-	if err := workerSettings.Queues.Set(workerSettings.QueuesString); err != nil {
+	if err := workerSettings.queues.Set(workerSettings.QueuesString); err != nil {
 		return err
 	}
-	if err := workerSettings.Interval.SetFloat(workerSettings.IntervalFloat); err != nil {
+	if err := workerSettings.interval.SetFloat(workerSettings.IntervalFloat); err != nil {
 		return err
 	}
 	workerSettings.IsStrict = strings.IndexRune(workerSettings.QueuesString, '=') == -1
