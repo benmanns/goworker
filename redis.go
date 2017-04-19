@@ -119,6 +119,13 @@ func redisSentinelConnection(settings RedisSettings) (redis.Conn, error) {
 			}
 			return redis.Dial(schemeMap[settings.Scheme], masterAddr)
 		},
+		TestOnBorrow: func(c redis.Conn, t time.Time) error {
+			if !sentinel.TestRole(c, "master") {
+				return errors.New("Role check failed")
+			} else {
+				return nil
+			}
+		},
 	}
 
 	return pool.Dial()
