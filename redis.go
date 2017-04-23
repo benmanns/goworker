@@ -27,14 +27,14 @@ func (r *RedisConn) Close() {
 	_ = r.Conn.Close()
 }
 
+func newRedisPool(settings RedisSettings, capacity int, maxCapacity int, idleTimout time.Duration) *pools.ResourcePool {
+	return pools.NewResourcePool(newRedisFactory(settings), capacity, maxCapacity, idleTimout)
+}
+
 func newRedisFactory(settings RedisSettings) pools.Factory {
 	return func() (pools.Resource, error) {
 		return redisConnFromSettings(settings)
 	}
-}
-
-func newRedisPool(settings RedisSettings, capacity int, maxCapacity int, idleTimout time.Duration) *pools.ResourcePool {
-	return pools.NewResourcePool(newRedisFactory(settings), capacity, maxCapacity, idleTimout)
 }
 
 func parseSettingsURI(settings *RedisSettings) error {
