@@ -9,8 +9,8 @@ import (
 	"golang.org/x/net/context"
 
 	"errors"
+	"github.com/FZambia/go-sentinel"
 	"github.com/cihub/seelog"
-	"github.com/garyburd/redigo/redis"
 	"github.com/youtube/vitess/go/pools"
 	"net"
 )
@@ -117,9 +117,6 @@ func getConnSentinel() (*RedisConn, error) {
 		}
 		conn := resource.(*RedisConn)
 
-		// close the connection and remove it from the pool so that new
-		// connections get created
-
 		// if the instance does not ping back
 		_, err = conn.Do("ping")
 		if err != nil {
@@ -128,17 +125,13 @@ func getConnSentinel() (*RedisConn, error) {
 			return nil, deadConnection
 		}
 
-		// or if the instance is not a master anymore
-		role, err := redis.String(conn.Do("role"))
-		if err != nil {
-			PutConn(nil)
-			return nil, err
-		}
-		if role != "master" {
+		// or is not a master any more
+		if !sentinel.TestRole(conn.Conn, "master") {
 			conn.Close()
 			PutConn(nil)
 			return nil, slaveConnection
 		}
+
 		return conn, nil
 	}
 
