@@ -148,7 +148,11 @@ func getConnSentinel() (*RedisConn, error) {
 		if conn, err = try(); err == nil {
 			return conn, nil
 		} else if err != slaveConnection && err != deadConnection {
-			if err, ok := err.(net.Error); ok && !err.Timeout() {
+			if err, ok := err.(net.Error); ok {
+				if !err.Timeout() {
+					return nil, err
+				}
+			} else {
 				return nil, err
 			}
 		}
