@@ -17,6 +17,7 @@ var (
 		"redis": "tcp",
 		"unix":  "unix",
 	}
+	sentinelConnection = false
 )
 
 type RedisConn struct {
@@ -72,8 +73,10 @@ func redisConnFromSettings(settings RedisSettings) (*RedisConn, error) {
 	}
 
 	if settings.MasterName == "" {
+		sentinelConnection = false
 		conn, err = redis.Dial(schemeMap[settings.Scheme], settings.Host)
 	} else {
+		sentinelConnection = true
 		conn, err = redisSentinelConnection(settings)
 	}
 	if err != nil {
@@ -129,4 +132,27 @@ func redisSentinelConnection(settings RedisSettings) (redis.Conn, error) {
 	}
 
 	return pool.Dial()
+}
+
+func isSentinelConnection() bool {
+	return sentinelConnection
+}
+
+func validateConnection(conn *RedisConn) bool {
+	if !isSentinelConnection() {
+		return true
+	}
+
+	// if the instance does not ping back
+	_, err := conn.Do("ping")
+	if err != nil {
+		return false
+	}
+
+	// or is not a master any more
+	if !sentinel.TestRole(conn.Conn, "master") {
+		return false
+	}
+
+	return true
 }

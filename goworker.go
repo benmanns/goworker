@@ -9,21 +9,19 @@ import (
 	"golang.org/x/net/context"
 
 	"errors"
-	"github.com/FZambia/go-sentinel"
 	"github.com/cihub/seelog"
 	"github.com/youtube/vitess/go/pools"
 	"net"
 )
 
 var (
-	logger      seelog.LoggerInterface
-	pool        *pools.ResourcePool
-	ctx         context.Context
-	initMutex   sync.Mutex
-	initialized bool
+	logger         seelog.LoggerInterface
+	pool           *pools.ResourcePool
+	ctx            context.Context
+	initMutex      sync.Mutex
+	initialized    bool
+	workerSettings WorkerSettings
 )
-
-var workerSettings WorkerSettings
 
 type WorkerSettings struct {
 	QueuesString   string
@@ -90,64 +88,41 @@ func Init() error {
 // while they wait for an available connection. Expect this
 // API to change drastically.
 func GetConn() (*RedisConn, error) {
-	if workerSettings.RedisSettings.MasterName == "" {
-		return getConn()
+	var connectionAttempts int
+	if isSentinelConnection() {
+		connectionAttempts = workerSettings.Connections + 1
 	} else {
-		return getConnSentinel()
+		connectionAttempts = 1
 	}
+	return getConn(connectionAttempts)
 }
 
-func getConn() (*RedisConn, error) {
+func getConn(attemptsLeft int) (*RedisConn, error) {
+	if attemptsLeft <= 0 {
+		return nil, errors.New("Unable to get connection")
+	}
+
 	resource, err := pool.Get(ctx)
-
 	if err != nil {
-		return nil, err
-	}
-	return resource.(*RedisConn), nil
-}
-
-func getConnSentinel() (*RedisConn, error) {
-	deadConnection := errors.New("Dead connection")
-	slaveConnection := errors.New("Stale connection (to slave, not master)")
-	try := func() (*RedisConn, error) {
-		conn, err := getConn()
-
-		// if the instance does not ping back
-		_, err = conn.Do("ping")
-		if err != nil {
-			conn.Close()
-			pool.Put(nil)
-			return nil, deadConnection
-		}
-
-		// or is not a master any more
-		if !sentinel.TestRole(conn.Conn, "master") {
-			conn.Close()
-			pool.Put(nil)
-			return nil, slaveConnection
-		}
-
-		return conn, nil
-	}
-
-	var conn *RedisConn
-	var err error
-
-	for i := 0; i < workerSettings.Connections+1; i++ {
-		if conn, err = try(); err == nil {
-			return conn, nil
-		} else if err != slaveConnection && err != deadConnection {
-			if err, ok := err.(net.Error); ok {
-				if !err.Timeout() {
-					return nil, err
-				}
-			} else {
-				return nil, err
-			}
+		// If we get a timeout when connection to the redis server
+		// we should retry it
+		if nerr, ok := err.(net.Error); ok && nerr.Timeout() {
+			return getConn(attemptsLeft - 1)
+		} else {
+			return nil, err
 		}
 	}
 
-	return conn, err
+	conn := resource.(*RedisConn)
+	ok := validateConnection(conn)
+	if !ok {
+		// If our connection is not valid, we need to remove it from the pool and try again
+		conn.Close()
+		pool.Put(nil)
+		return getConn(attemptsLeft - 1)
+	}
+
+	return conn, nil
 }
 
 // PutConn puts a connection back into the connection pool.
