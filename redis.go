@@ -3,6 +3,7 @@ package goworker
 import (
 	"errors"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/FZambia/go-sentinel"
@@ -17,7 +18,9 @@ var (
 		"redis": "tcp",
 		"unix":  "unix",
 	}
-	sentinelConnection = false
+	sentinelConnection   = false
+	roleCommandAvailable = true
+	roleCommandTested    = false
 )
 
 type RedisConn struct {
@@ -122,13 +125,6 @@ func redisSentinelConnection(settings RedisSettings) (redis.Conn, error) {
 			}
 			return redis.Dial(schemeMap[settings.Scheme], masterAddr)
 		},
-		TestOnBorrow: func(c redis.Conn, t time.Time) error {
-			if !sentinel.TestRole(c, "master") {
-				return errors.New("Role check failed")
-			} else {
-				return nil
-			}
-		},
 	}
 
 	return pool.Dial()
@@ -149,10 +145,33 @@ func validateConnection(conn *RedisConn) bool {
 		return false
 	}
 
-	// or is not a master any more
-	if !sentinel.TestRole(conn.Conn, "master") {
+	if !testRole(conn, "master") {
 		return false
 	}
 
 	return true
+}
+
+func testRole(conn *RedisConn, expectedRole string) bool {
+	if !roleCommandTested {
+		_, err := conn.Do("ROLE")
+		if err != nil {
+			roleCommandAvailable = false
+		}
+		roleCommandTested = true
+	}
+
+	if roleCommandAvailable {
+		return sentinel.TestRole(conn.Conn, expectedRole)
+	} else {
+		data, err := conn.Do("INFO")
+		if err != nil {
+			return false
+		}
+		str, ok := data.([]uint8)
+		if !ok {
+			return false
+		}
+		return strings.Contains(string(str), "role:"+expectedRole)
+	}
 }
