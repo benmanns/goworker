@@ -79,8 +79,8 @@ var queuesFlagSetTests = []struct {
 }
 
 func TestQueuesFlagSet(t *testing.T) {
+	actual := new(queuesFlag)
 	for _, tt := range queuesFlagSetTests {
-		actual := new(queuesFlag)
 		err := actual.Set(tt.v)
 		if fmt.Sprint(actual) != fmt.Sprint(tt.expected) {
 			t.Errorf("QueuesFlag: set to %s expected %v, actual %v", tt.v, tt.expected, actual)

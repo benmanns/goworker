@@ -15,6 +15,7 @@ var (
 type queuesFlag []string
 
 func (q *queuesFlag) Set(value string) error {
+	*q = queuesFlag{}
 	for _, queueAndWeight := range strings.Split(value, ",") {
 		if queueAndWeight == "" {
 			continue
