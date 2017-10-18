@@ -42,6 +42,10 @@ func SetSettings(settings WorkerSettings) {
 	workerSettings = settings
 }
 
+func SetRedisSettings(redisSettings RedisSettings) {
+	workerSettings.RedisSettings = redisSettings
+}
+
 type RedisSettings struct {
 	URI        string
 	Host       string
