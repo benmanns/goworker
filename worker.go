@@ -4,12 +4,23 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"runtime"
+	"strings"
 	"sync"
 	"time"
 )
 
 type worker struct {
 	process
+}
+
+type stacktraceError struct {
+	Err        error
+	Stacktrace []string
+}
+
+func (e *stacktraceError) Error() string {
+	return e.Err.Error()
 }
 
 func newWorker(id string, queues []string) (*worker, error) {
@@ -44,14 +55,15 @@ func (w *worker) start(conn *RedisConn, job *Job) error {
 	return w.process.start(conn)
 }
 
-func (w *worker) fail(conn *RedisConn, job *Job, err error) error {
+func (w *worker) fail(conn *RedisConn, job *Job, traceErr *stacktraceError) error {
 	failure := &failure{
 		FailedAt:  time.Now(),
 		Payload:   job.Payload,
 		Exception: "Error",
-		Error:     err.Error(),
+		Error:     traceErr.Error(),
 		Worker:    w,
 		Queue:     job.Queue,
+		Backtrace: traceErr.Stacktrace,
 	}
 	buffer, err := json.Marshal(failure)
 	if err != nil {
@@ -73,8 +85,8 @@ func (w *worker) succeed(conn *RedisConn, job *Job) error {
 	return nil
 }
 
-func (w *worker) finish(conn *RedisConn, job *Job, err error) error {
-	if err != nil {
+func (w *worker) finish(conn *RedisConn, job *Job, err *stacktraceError) error {
+	if err.Err != nil {
 		w.fail(conn, job, err)
 	} else {
 		w.succeed(conn, job)
@@ -121,7 +133,10 @@ func (w *worker) work(jobs <-chan *Job, monitor *sync.WaitGroup) {
 					logger.Criticalf("Error on getting connection in worker %v", w)
 					return
 				} else {
-					w.finish(conn, job, errors.New(errorLog))
+					stackErr := &stacktraceError{
+						Err: errors.New(errorLog),
+					}
+					w.finish(conn, job, stackErr)
 					PutConn(conn)
 				}
 			}
@@ -130,30 +145,35 @@ func (w *worker) work(jobs <-chan *Job, monitor *sync.WaitGroup) {
 }
 
 func (w *worker) run(job *Job, workerFunc workerFunc) {
-	var err error
+	var err stacktraceError
 	defer func() {
 		conn, errCon := GetConn()
 		if errCon != nil {
 			logger.Criticalf("Error on getting connection in worker %v", w)
 			return
 		} else {
-			w.finish(conn, job, err)
+			w.finish(conn, job, &err)
 			PutConn(conn)
 		}
 	}()
 	defer func() {
 		if r := recover(); r != nil {
-			err = errors.New(fmt.Sprint(r))
+			stackBuf := make([]byte, 2048)
+			runtime.Stack(stackBuf, false)
+			stack := string(stackBuf[:])
+			err.Err = errors.New(fmt.Sprint(r))
+			err.Stacktrace = strings.Split(stack, "\n")
 		}
 	}()
 
-	conn, err := GetConn()
-	if err != nil {
+	var conn *RedisConn
+	conn, err.Err = GetConn()
+	if err.Err != nil {
 		logger.Criticalf("Error on getting connection in worker %v", w)
 		return
 	} else {
 		w.start(conn, job)
 		PutConn(conn)
 	}
-	err = workerFunc(job.Queue, job.Payload.Args...)
+	err.Err = workerFunc(job.Queue, job.Payload.Args...)
 }
