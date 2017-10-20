@@ -103,6 +103,7 @@ var (
 	exitOnComplete bool
 	isStrict       bool
 	useNumber      bool
+	multiQueue     bool
 )
 
 // Namespace returns the namespace flag for goworker. You
@@ -138,6 +139,8 @@ func init() {
 	flag.BoolVar(&exitOnComplete, "exit-on-complete", false, "exit when the queue is empty")
 
 	flag.BoolVar(&useNumber, "use-number", false, "use json.Number instead of float64 when decoding numbers in JSON. will default to true soon")
+
+	flag.BoolVar(&multiQueue, "multi-queue", false, "use the multi-queue failure backend")
 }
 
 func flags() error {

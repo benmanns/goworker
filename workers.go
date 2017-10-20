@@ -44,6 +44,11 @@ func Enqueue(job *Job) error {
 		logger.Criticalf("Cant push to queue")
 		return err
 	}
+	err = conn.Send("SADD", fmt.Sprintf("%squeues", namespace), job.Queue)
+	if err != nil {
+		logger.Criticalf("Can't watch queue")
+		return err
+	}
 
 	return conn.Flush()
 }

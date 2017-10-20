@@ -57,7 +57,11 @@ func (w *worker) fail(conn *RedisConn, job *Job, err error) error {
 	if err != nil {
 		return err
 	}
-	conn.Send("RPUSH", fmt.Sprintf("%sfailed", namespace), buffer)
+	if multiQueue {
+		conn.Send("RPUSH", fmt.Sprintf("%s%s_failed", namespace, job.Queue), buffer)
+	} else {
+		conn.Send("RPUSH", fmt.Sprintf("%sfailed", namespace), buffer)
+	}
 
 	return w.process.fail(conn)
 }
