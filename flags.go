@@ -124,6 +124,9 @@ func init() {
 	flag.BoolVar(&workerSettings.ExitOnComplete, "exit-on-complete", false, "exit when the queue is empty")
 
 	flag.BoolVar(&workerSettings.UseNumber, "use-number", false, "use json.Number instead of float64 when decoding numbers in JSON. will default to true soon")
+
+	var config string
+	flag.StringVar(&config, "config", "", "Dummy Config")
 }
 
 func flags() error {
