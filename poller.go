@@ -51,14 +51,14 @@ func (p *poller) getJob(conn *RedisConn) (*Job, error) {
 	return nil, nil
 }
 
-func (p *poller) poll(interval time.Duration, quit <-chan bool) <-chan *Job {
+func (p *poller) poll(interval time.Duration, quit <-chan bool) (<-chan *Job, error) {
 	jobs := make(chan *Job)
 
 	conn, err := GetConn()
 	if err != nil {
 		logger.Criticalf("Error on getting connection in poller %s: %v", p, err)
 		close(jobs)
-		return jobs
+		return jobs, err
 	} else {
 		p.open(conn)
 		p.start(conn)
@@ -139,5 +139,5 @@ func (p *poller) poll(interval time.Duration, quit <-chan bool) <-chan *Job {
 		}
 	}()
 
-	return jobs
+	return jobs, nil
 }
