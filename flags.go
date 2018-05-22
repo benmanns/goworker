@@ -121,7 +121,7 @@ func init() {
 
 	flag.StringVar(&workerSettings.Namespace, "namespace", "resque:", "the Redis namespace")
 
-	flag.StringVar(&workerSettings.TLSCertPath, "tlscert", "", "path to a custom CA cert")
+	flag.StringVar(&workerSettings.TLSCertPath, "tls-cert", "", "path to a custom CA cert")
 
 	flag.BoolVar(&workerSettings.ExitOnComplete, "exit-on-complete", false, "exit when the queue is empty")
 
