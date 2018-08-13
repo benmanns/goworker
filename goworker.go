@@ -129,7 +129,10 @@ func Work() error {
 	if err != nil {
 		return err
 	}
-	jobs := poller.poll(time.Duration(workerSettings.Interval), quit)
+	jobs, err := poller.poll(time.Duration(workerSettings.Interval), quit)
+	if err != nil {
+		return err
+	}
 
 	var monitor sync.WaitGroup
 
