@@ -34,6 +34,8 @@ type WorkerSettings struct {
 	ExitOnComplete bool
 	IsStrict       bool
 	UseNumber      bool
+	SkipTLSVerify  bool
+	TLSCertPath    string
 }
 
 func SetSettings(settings WorkerSettings) {

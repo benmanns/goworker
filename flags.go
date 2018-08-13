@@ -121,9 +121,13 @@ func init() {
 
 	flag.StringVar(&workerSettings.Namespace, "namespace", "resque:", "the Redis namespace")
 
+	flag.StringVar(&workerSettings.TLSCertPath, "tls-cert", "", "path to a custom CA cert")
+
 	flag.BoolVar(&workerSettings.ExitOnComplete, "exit-on-complete", false, "exit when the queue is empty")
 
 	flag.BoolVar(&workerSettings.UseNumber, "use-number", false, "use json.Number instead of float64 when decoding numbers in JSON. will default to true soon")
+
+	flag.BoolVar(&workerSettings.SkipTLSVerify, "insecure-tls", false, "skip TLS validation")
 }
 
 func flags() error {
