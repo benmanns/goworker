@@ -89,6 +89,8 @@ func (p *poller) poll(pool *pools.ResourcePool, interval time.Duration, quit <-c
 					job, err := p.getJob(conn)
 					if err != nil {
 						logger.Errorf("Error on %v getting job from %v: %v", p, p.Queues, err)
+						pool.Put(conn)
+						return
 					}
 					if job != nil {
 						conn.Send("INCR", fmt.Sprintf("%sstat:processed:%v", namespace, p))
@@ -105,6 +107,7 @@ func (p *poller) poll(pool *pools.ResourcePool, interval time.Duration, quit <-c
 							resource, err := pool.Get()
 							if err != nil {
 								logger.Criticalf("Error on getting connection in poller %s", p)
+								return
 							}
 
 							conn := resource.(*redisConn)
