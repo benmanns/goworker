@@ -12,8 +12,8 @@ type poller struct {
 	isStrict bool
 }
 
-func newPoller(queues []string, isStrict bool) (*poller, error) {
-	process, err := newProcess("poller", queues)
+func newPoller(queues []string, queuesPriority map[string]int, isStrict bool) (*poller, error) {
+	process, err := newProcess("poller", queues, queuesPriority)
 	if err != nil {
 		return nil, err
 	}
@@ -23,8 +23,18 @@ func newPoller(queues []string, isStrict bool) (*poller, error) {
 	}, nil
 }
 
+// getJob returns a job from the non-empty highest priority queue.
+// If no priorities were provided, all queues have the same priority: 0 (the highest).
 func (p *poller) getJob(conn *RedisConn) (*Job, error) {
-	for _, queue := range p.queues(p.isStrict) {
+	var (
+		queues = p.queues(p.isStrict)
+		queue  string
+	)
+
+	// iterate the queues in the same order they were sorted
+	for i := 0; i < len(queues); i++ {
+		queue = queues[i]
+
 		logger.Debugf("Checking %s", queue)
 
 		reply, err := conn.Do("LPOP", fmt.Sprintf("%squeue:%s", workerSettings.Namespace, queue))
