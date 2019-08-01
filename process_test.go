@@ -72,7 +72,7 @@ var (
 		// queues + negative priority (automatically set to zero: the highest priority)
 		{
 			&process{
-				Pid:    4,
+				Pid:    5,
 				Queues: []string{"low-priority", "med-priority", "high-priority"},
 				QueuesPriority: map[string]int{
 					"high-priority": -10,
