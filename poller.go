@@ -31,7 +31,7 @@ func (p *poller) getJob(conn *RedisConn) (*Job, error) {
 		queue  string
 	)
 
-	// iterate the queues in the same order they were sorted
+	// iterate the queues in the exact order they were sorted
 	for i := 0; i < len(queues); i++ {
 		queue = queues[i]
 

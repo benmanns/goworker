@@ -106,7 +106,7 @@ func (p *process) queues(strict bool) []string {
 // getQueuesSortedByPriority returns the original queue list sorted by increasing priorities (based on QueuesPriority).
 // The original queue list will be unaltered if QueuesPriority is not provided.
 func (p *process) getQueuesSortedByPriority() []string {
-	// priorities are the same if no priorities were defined
+	// priorities are the same for all queues if no priorities were defined
 	if p.QueuesPriority == nil {
 		return p.Queues
 	}
@@ -117,6 +117,10 @@ func (p *process) getQueuesSortedByPriority() []string {
 	for _, queue := range p.Queues {
 		// get queue's priority
 		if priority, ok := p.QueuesPriority[queue]; ok {
+			// not allowed a highest priority than zero
+			if priority < 0 {
+				priority = 0
+			}
 			// insert queue into priority list
 			p.insertQueueIntoPriorityMap(queue, priority, pQueueMap)
 		} else {
