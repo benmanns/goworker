@@ -23,19 +23,20 @@ var (
 var workerSettings WorkerSettings
 
 type WorkerSettings struct {
-	QueuesString   string
-	Queues         queuesFlag
-	IntervalFloat  float64
-	Interval       intervalFlag
-	Concurrency    int
-	Connections    int
-	URI            string
-	Namespace      string
-	ExitOnComplete bool
-	IsStrict       bool
-	UseNumber      bool
-	SkipTLSVerify  bool
-	TLSCertPath    string
+	QueuesString       string
+	Queues             queuesFlag
+	IntervalFloat      float64
+	Interval           intervalFlag
+	Concurrency        int
+	Connections        int
+	URI                string
+	Namespace          string
+	ExitOnComplete     bool
+	IsStrict           bool
+	UseNumber          bool
+	SkipTLSVerify      bool
+	TLSCertPath        string
+	prefillParallelism int
 }
 
 func SetSettings(settings WorkerSettings) {
@@ -61,7 +62,7 @@ func Init() error {
 		}
 		ctx = context.Background()
 
-		pool = newRedisPool(workerSettings.URI, workerSettings.Connections, workerSettings.Connections, time.Minute)
+		pool = newRedisPool(workerSettings.URI, workerSettings.Connections, workerSettings.Connections, time.Minute, workerSettings.prefillParallelism)
 
 		initialized = true
 	}
