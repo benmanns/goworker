@@ -36,7 +36,7 @@ type WorkerSettings struct {
 	UseNumber          bool
 	SkipTLSVerify      bool
 	TLSCertPath        string
-	prefillParallelism int
+	PrefillParallelism int
 }
 
 func SetSettings(settings WorkerSettings) {
@@ -62,7 +62,7 @@ func Init() error {
 		}
 		ctx = context.Background()
 
-		pool = newRedisPool(workerSettings.URI, workerSettings.Connections, workerSettings.Connections, time.Minute, workerSettings.prefillParallelism)
+		pool = newRedisPool(workerSettings.URI, workerSettings.Connections, workerSettings.Connections, time.Minute, workerSettings.PrefillParallelism)
 
 		initialized = true
 	}
