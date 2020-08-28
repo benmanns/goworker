@@ -13,12 +13,12 @@ executors:
         type: string
         default: latest
     docker:
-      - image: circleci/golang:<< parameters.golang >>
+      - image: "circleci/golang:<< parameters.golang >>"
         user: root
         environment:
           GO111MODULE: "on"
 
-      - image: redis:<< parameters.redis >>
+      - image: "redis:<< parameters.redis >>"
 
 jobs:
   build:
@@ -33,8 +33,8 @@ jobs:
         default: latest
     executor:
       name: go-with-redis
-      golang: << parameters.golang >>
-      redis: << parameters.redis >>
+      golang: "<< parameters.golang >>"
+      redis: "<< parameters.redis >>"
     working_directory: /go/src/github.com/benmanns/goworker
     environment:
       TEST_RESULTS: /tmp/test-results
