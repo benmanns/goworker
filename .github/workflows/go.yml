@@ -11,17 +11,13 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        go: [ '1.13', '1.14' ]
-        redis-version: [ 4, 5, 6]
-    services:
-      redis:
-        images: redis
-        # Set health checks to wait until redis has started
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
+        go:
+          - "1.13"
+          - "1.14"
+        redis-version:
+          - 4
+          - 5
+          - 6
 
     steps:
       - name: Check out code into the Go module directory
@@ -33,7 +29,7 @@ jobs:
           go-version: ${{ matrix.go }}
 
       - name: Setup Redis
-        uses: supercharge/redis-github-action@1
+        uses: supercharge/redis-github-action@1.1.0
         with:
           redis-version: ${{ matrix.redis-version }}
 
