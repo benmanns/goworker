@@ -83,3 +83,5 @@ workflows:
                 - "latest"
               redis:
                 - "4"
+                - "5"
+                - "6"
