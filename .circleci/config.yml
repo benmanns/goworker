@@ -1,60 +1,78 @@
-version: 2
+---
+version: 2.1
 
-shared: &shared
-  working_directory: /go/src/github.com/benmanns/goworker
-  environment:
-    TEST_RESULTS: /tmp/test-results
-  steps:
-    - checkout
-    - run: mkdir -p $TEST_RESULTS
-    - restore_cache:
-        keys:
-          - v1-pkg-cache
-    - run: go get ./...
-    - run: go get github.com/jstemmer/go-junit-report
-    - run:
-        name: Waiting for Redis to be ready
-        command: |
-          for i in `seq 1 10`;
-          do
-            nc -z localhost 6379 && echo Success && exit 0
-            echo -n .
-            sleep 1
-          done
-          echo Failed waiting for Redis && exit 1
-    - run:
-        name: Run unit tests
-        command: |
-          trap "go-junit-report <${TEST_RESULTS}/go-test.out > ${TEST_RESULTS}/go-test-report.xml" EXIT
-          go test -v github.com/benmanns/goworker | tee ${TEST_RESULTS}/go-test.out
-    - save_cache:
-        key: v1-pkg-cache
-        paths:
-          - ~/.cache/go-build
-    - store_test_results:
-        path: /tmp/test-results
+executors:
+  go-with-redis:
+    parameters:
+      golang:
+        description: golang version
+        type: string
+        default: latest
+      redis:
+        description: redis version
+        type: string
+        default: latest
+    docker:
+      - image: circleci/golang:<< parameters.golang >>
+      - image: redis:<< parameters.redis >>
 
 jobs:
-  "build_and_test-latest":
-    <<: *shared
-    docker:
-      - image: circleci/golang:latest
-      - image: redis:4
-  "build_and_test-1.11":
-    <<: *shared
-    docker:
-      - image: circleci/golang:1.11
-      - image: redis:4
-  "build_and_test-1.10":
-    <<: *shared
-    docker:
-      - image: circleci/golang:1.10
-      - image: redis:4
+  test:
+    parameters:
+      golang:
+        description: golang version
+        type: string
+        default: latest
+      redis:
+        description: redis version
+        type: string
+        default: latest
+    executor:
+      name: go-with-redis
+      golang: << parameters.golang >>
+      redis: << parameters.redis >>
+    working_directory: /go/src/github.com/benmanns/goworker
+    environment:
+      TEST_RESULTS: /tmp/test-results
+    steps:
+      - checkout
+      - run: mkdir -p $TEST_RESULTS
+      - restore_cache:
+          keys:
+            - v1-pkg-cache
+      - run: go get ./...
+      - run: go get github.com/jstemmer/go-junit-report
+      - run:
+          name: Waiting for Redis to be ready
+          command: |
+            for i in `seq 1 10`;
+            do
+              nc -z localhost 6379 && echo Success && exit 0
+              echo -n .
+              sleep 1
+            done
+            echo Failed waiting for Redis && exit 1
+      - run:
+          name: Run unit tests
+          command: |
+            trap "go-junit-report <${TEST_RESULTS}/go-test.out > ${TEST_RESULTS}/go-test-report.xml" EXIT
+            go test -v github.com/benmanns/goworker | tee ${TEST_RESULTS}/go-test.out
+      - save_cache:
+          key: v1-pkg-cache
+          paths:
+            - ~/.cache/go-build
+      - store_test_results:
+          path: /tmp/test-results
 
 workflows:
-  version: 2
   build_and_test:
     jobs:
-      - "build_and_test-latest"
-      - "build_and_test-1.11"
-      - "build_and_test-1.10"
+      - test:
+          matrix:
+            parameters:
+              golang:
+                - "1.10"
+                - "1.11"
+                - "latest"
+              redis:
+                - "4"
