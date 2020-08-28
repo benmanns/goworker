@@ -31,8 +31,8 @@ func newRedisFactory(uri string) pools.Factory {
 	}
 }
 
-func newRedisPool(uri string, capacity int, maxCapacity int, idleTimout time.Duration) *pools.ResourcePool {
-	return pools.NewResourcePool(newRedisFactory(uri), capacity, maxCapacity, idleTimout)
+func newRedisPool(uri string, capacity int, maxCapacity int, idleTimout time.Duration, prefillParallelism int) *pools.ResourcePool {
+	return pools.NewResourcePool(newRedisFactory(uri), capacity, maxCapacity, idleTimout, prefillParallelism)
 }
 
 func redisConnFromURI(uriString string) (*RedisConn, error) {

@@ -115,6 +115,7 @@ func init() {
 		Concurrency:    2,
 		Namespace:      "resque:",
 		Interval:       5.0,
+		PrefillParallelism: 0,
 	}
 	goworker.SetSettings(settings)
 	goworker.Register("MyClass", myFunc)
