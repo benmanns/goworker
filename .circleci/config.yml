@@ -14,6 +14,10 @@ executors:
         default: latest
     docker:
       - image: circleci/golang:<< parameters.golang >>
+        user: root
+        environment:
+          GO111MODULE: "on"
+
       - image: redis:<< parameters.redis >>
 
 jobs:
@@ -65,14 +69,17 @@ jobs:
           path: /tmp/test-results
 
 workflows:
-  build_and_test:
+  test:
     jobs:
       - test:
           matrix:
             parameters:
               golang:
-                - "1.10"
                 - "1.11"
+                - "1.12"
+                - "1.13"
+                - "1.14"
+                - "1.15"
                 - "latest"
               redis:
                 - "4"
