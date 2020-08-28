@@ -29,7 +29,7 @@ jobs:
           go-version: ${{ matrix.go }}
 
       - name: Setup Redis
-        uses: supercharge/redis-github-action@1
+        uses: supercharge/redis-github-action@1.1.0
         with:
           redis-version: ${{ matrix.redis-version }}
 
