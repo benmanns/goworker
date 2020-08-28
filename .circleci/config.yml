@@ -21,7 +21,7 @@ executors:
       - image: redis:<< parameters.redis >>
 
 jobs:
-  test:
+  build:
     parameters:
       golang:
         description: golang version
@@ -69,9 +69,10 @@ jobs:
           path: /tmp/test-results
 
 workflows:
-  test:
+  build:
     jobs:
-      - test:
+      - build:
+          name: "build-go<< matrix.golang>>-redis<< matrix.redis >>"
           matrix:
             parameters:
               golang:
@@ -80,8 +81,9 @@ workflows:
                 - "1.13"
                 - "1.14"
                 - "1.15"
-                - "latest"
+                - "latest" # might be redundant, but good to ensure we're always covering latest
               redis:
                 - "4"
                 - "5"
                 - "6"
+                - "latest" # might be redundant, but good to ensure we're always covering latest
