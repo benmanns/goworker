@@ -1,4 +1,4 @@
-module github.com/doximity/amion-sync
+module github.com/benmanns/goworkers
 
 go 1.14
 
