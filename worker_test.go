@@ -1,6 +1,7 @@
 package goworker
 
 import (
+	"flag"
 	"reflect"
 	"testing"
 )
@@ -51,9 +52,10 @@ func TestEnqueue(t *testing.T) {
 		},
 	}
 
-	workerSettings.Queues = []string{queueName}
-	workerSettings.UseNumber = true
-	workerSettings.ExitOnComplete = true
+	flag.Set("exit-on-complete", "true")
+	flag.Set("queues", queueName)
+	flag.Set("concurrency", "1")
+	flag.Set("use-number", "true")
 
 	err := Enqueue(expectedJob)
 	if err != nil {
