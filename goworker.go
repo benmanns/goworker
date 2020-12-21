@@ -1,20 +1,25 @@
 package goworker
 
 import (
+	"crypto/tls"
+	"crypto/x509"
+	"fmt"
+	"io/ioutil"
 	"os"
 	"strconv"
 	"sync"
 	"time"
 
+	"github.com/go-redis/redis/v7"
+
 	"golang.org/x/net/context"
 
 	"github.com/cihub/seelog"
-	"vitess.io/vitess/go/pools"
 )
 
 var (
 	logger      seelog.LoggerInterface
-	pool        *pools.ResourcePool
+	client      *redis.Client
 	ctx         context.Context
 	initMutex   sync.Mutex
 	initialized bool
@@ -61,54 +66,66 @@ func Init() error {
 		}
 		ctx = context.Background()
 
-		pool = newRedisPool(workerSettings.URI, workerSettings.Connections, workerSettings.Connections, time.Minute)
+		opts, err := redis.ParseURL(workerSettings.URI)
+		if err != nil {
+			return err
+		}
+
+		if len(workerSettings.TLSCertPath) > 0 {
+			certPool, err := getCertPool()
+			if err != nil {
+				return err
+			}
+			opts.TLSConfig = &tls.Config{
+				RootCAs:            certPool,
+				InsecureSkipVerify: workerSettings.SkipTLSVerify,
+			}
+		}
+
+		client = redis.NewClient(opts).WithContext(ctx)
+		err = client.Ping().Err()
+		if err != nil {
+			return err
+		}
 
 		initialized = true
 	}
+
 	return nil
 }
 
-// GetConn returns a connection from the goworker Redis
-// connection pool. When using the pool, check in
-// connections as quickly as possible, because holding a
-// connection will cause concurrent worker functions to lock
-// while they wait for an available connection. Expect this
-// API to change drastically.
-func GetConn() (*RedisConn, error) {
-	resource, err := pool.Get(ctx)
-
-	if err != nil {
-		return nil, err
+func getCertPool() (*x509.CertPool, error) {
+	rootCAs, _ := x509.SystemCertPool()
+	if rootCAs == nil {
+		rootCAs = x509.NewCertPool()
 	}
-	return resource.(*RedisConn), nil
-}
-
-// PutConn puts a connection back into the connection pool.
-// Run this as soon as you finish using a connection that
-// you got from GetConn. Expect this API to change
-// drastically.
-func PutConn(conn *RedisConn) {
-	pool.Put(conn)
+	certs, err := ioutil.ReadFile(workerSettings.TLSCertPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read %q for the RootCA pool: %v", workerSettings.TLSCertPath, err)
+	}
+	if ok := rootCAs.AppendCertsFromPEM(certs); !ok {
+		return nil, fmt.Errorf("failed to append %q to the RootCA pool: %v", workerSettings.TLSCertPath, err)
+	}
+	return rootCAs, nil
 }
 
 // Close cleans up resources initialized by goworker. This
 // will be called by Work when cleaning up. However, if you
 // are using the Init function to access goworker functions
 // and configuration without processing jobs by calling
-// Work, you should run this function when cleaning up. For
-// example,
-//
-//	if err := goworker.Init(); err != nil {
-//		fmt.Println("Error:", err)
-//	}
-//	defer goworker.Close()
-func Close() {
+// Work, you should run this function when cleaning up.
+func Close() error {
 	initMutex.Lock()
 	defer initMutex.Unlock()
 	if initialized {
-		pool.Close()
+		err := client.Close()
+		if err != nil {
+			return err
+		}
 		initialized = false
 	}
+
+	return nil
 }
 
 // Work starts the goworker process. Check for errors in
