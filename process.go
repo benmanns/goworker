@@ -6,6 +6,8 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	"github.com/go-redis/redis/v7"
 )
 
 type process struct {
@@ -33,44 +35,78 @@ func (p *process) String() string {
 	return fmt.Sprintf("%s:%d-%s:%s", p.Hostname, p.Pid, p.ID, strings.Join(p.Queues, ","))
 }
 
-func (p *process) open(conn *RedisConn) error {
-	conn.Send("SADD", fmt.Sprintf("%sworkers", workerSettings.Namespace), p)
-	conn.Send("SET", fmt.Sprintf("%sstat:processed:%v", workerSettings.Namespace, p), "0")
-	conn.Send("SET", fmt.Sprintf("%sstat:failed:%v", workerSettings.Namespace, p), "0")
-	conn.Flush()
+func (p *process) open(c *redis.Client) error {
+	err := c.SAdd(fmt.Sprintf("%sworkers", workerSettings.Namespace), p.String()).Err()
+	if err != nil {
+		return err
+	}
+
+	err = c.Set(fmt.Sprintf("%sstat:processed:%v", workerSettings.Namespace, p), "0", 0).Err()
+	if err != nil {
+		return err
+	}
+
+	err = c.Set(fmt.Sprintf("%sstat:failed:%v", workerSettings.Namespace, p), "0", 0).Err()
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
 
-func (p *process) close(conn *RedisConn) error {
+func (p *process) close(c *redis.Client) error {
 	logger.Infof("%v shutdown", p)
-	conn.Send("SREM", fmt.Sprintf("%sworkers", workerSettings.Namespace), p)
-	conn.Send("DEL", fmt.Sprintf("%sstat:processed:%s", workerSettings.Namespace, p))
-	conn.Send("DEL", fmt.Sprintf("%sstat:failed:%s", workerSettings.Namespace, p))
-	conn.Flush()
+	err := c.SRem(fmt.Sprintf("%sworkers", workerSettings.Namespace), p.String()).Err()
+	if err != nil {
+		return err
+	}
+
+	err = c.Del(fmt.Sprintf("%sstat:processed:%s", workerSettings.Namespace, p)).Err()
+	if err != nil {
+		return err
+	}
+
+	err = c.Del(fmt.Sprintf("%sstat:failed:%s", workerSettings.Namespace, p)).Err()
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
 
-func (p *process) start(conn *RedisConn) error {
-	conn.Send("SET", fmt.Sprintf("%sworker:%s:started", workerSettings.Namespace, p), time.Now().String())
-	conn.Flush()
+func (p *process) start(c *redis.Client) error {
+	err := c.Set(fmt.Sprintf("%sworker:%s:started", workerSettings.Namespace, p), time.Now().String(), 0).Err()
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
 
-func (p *process) finish(conn *RedisConn) error {
-	conn.Send("DEL", fmt.Sprintf("%sworker:%s", workerSettings.Namespace, p))
-	conn.Send("DEL", fmt.Sprintf("%sworker:%s:started", workerSettings.Namespace, p))
-	conn.Flush()
+func (p *process) finish(c *redis.Client) error {
+	err := c.Del(fmt.Sprintf("%sworker:%s", workerSettings.Namespace, p)).Err()
+	if err != nil {
+		return err
+	}
+
+	err = c.Del(fmt.Sprintf("%sworker:%s:started", workerSettings.Namespace, p)).Err()
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
 
-func (p *process) fail(conn *RedisConn) error {
-	conn.Send("INCR", fmt.Sprintf("%sstat:failed", workerSettings.Namespace))
-	conn.Send("INCR", fmt.Sprintf("%sstat:failed:%s", workerSettings.Namespace, p))
-	conn.Flush()
+func (p *process) fail(c *redis.Client) error {
+	err := c.Incr(fmt.Sprintf("%sstat:failed", workerSettings.Namespace)).Err()
+	if err != nil {
+		return err
+	}
+
+	err = c.Incr(fmt.Sprintf("%sstat:failed:%s", workerSettings.Namespace, p)).Err()
+	if err != nil {
+		return err
+	}
 
 	return nil
 }

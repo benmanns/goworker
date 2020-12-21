@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"sync"
 	"time"
+
+	"github.com/go-redis/redis/v7"
 )
 
 type worker struct {
@@ -26,7 +28,7 @@ func (w *worker) MarshalJSON() ([]byte, error) {
 	return json.Marshal(w.String())
 }
 
-func (w *worker) start(conn *RedisConn, job *Job) error {
+func (w *worker) start(c *redis.Client, job *Job) error {
 	work := &work{
 		Queue:   job.Queue,
 		RunAt:   time.Now(),
@@ -38,13 +40,17 @@ func (w *worker) start(conn *RedisConn, job *Job) error {
 		return err
 	}
 
-	conn.Send("SET", fmt.Sprintf("%sworker:%s", workerSettings.Namespace, w), buffer)
+	err = c.Set(fmt.Sprintf("%sworker:%s", workerSettings.Namespace, w), buffer, 0).Err()
+	if err != nil {
+		return err
+	}
+
 	logger.Debugf("Processing %s since %s [%v]", work.Queue, work.RunAt, work.Payload.Class)
 
-	return w.process.start(conn)
+	return w.process.start(c)
 }
 
-func (w *worker) fail(conn *RedisConn, job *Job, err error) error {
+func (w *worker) fail(c *redis.Client, job *Job, err error) error {
 	failure := &failure{
 		FailedAt:  time.Now(),
 		Payload:   job.Payload,
@@ -57,35 +63,49 @@ func (w *worker) fail(conn *RedisConn, job *Job, err error) error {
 	if err != nil {
 		return err
 	}
-	conn.Send("RPUSH", fmt.Sprintf("%sfailed", workerSettings.Namespace), buffer)
 
-	return w.process.fail(conn)
+	err = c.RPush(fmt.Sprintf("%sfailed", workerSettings.Namespace), buffer).Err()
+	if err != nil {
+		return err
+	}
+
+	return w.process.fail(c)
 }
 
-func (w *worker) succeed(conn *RedisConn, job *Job) error {
-	conn.Send("INCR", fmt.Sprintf("%sstat:processed", workerSettings.Namespace))
-	conn.Send("INCR", fmt.Sprintf("%sstat:processed:%s", workerSettings.Namespace, w))
+func (w *worker) succeed(c *redis.Client) error {
+	err := c.Incr(fmt.Sprintf("%sstat:processed", workerSettings.Namespace)).Err()
+	if err != nil {
+		return err
+	}
+
+	err = c.Incr(fmt.Sprintf("%sstat:processed:%s", workerSettings.Namespace, w)).Err()
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
 
-func (w *worker) finish(conn *RedisConn, job *Job, err error) error {
+func (w *worker) finish(c *redis.Client, job *Job, err error) error {
 	if err != nil {
-		w.fail(conn, job, err)
+		err = w.fail(c, job, err)
+		if err != nil {
+			return err
+		}
 	} else {
-		w.succeed(conn, job)
+		err = w.succeed(c)
+		if err != nil {
+			return err
+		}
 	}
-	return w.process.finish(conn)
+	return w.process.finish(c)
 }
 
 func (w *worker) work(jobs <-chan *Job, monitor *sync.WaitGroup) {
-	conn, err := GetConn()
+	err := w.open(client)
 	if err != nil {
-		logger.Criticalf("Error on getting connection in worker %v: %v", w, err)
+		logger.Criticalf("Error on opening worker %v: %v", w, err)
 		return
-	} else {
-		w.open(conn)
-		PutConn(conn)
 	}
 
 	monitor.Add(1)
@@ -94,13 +114,10 @@ func (w *worker) work(jobs <-chan *Job, monitor *sync.WaitGroup) {
 		defer func() {
 			defer monitor.Done()
 
-			conn, err := GetConn()
+			err := w.close(client)
 			if err != nil {
-				logger.Criticalf("Error on getting connection in worker %v: %v", w, err)
+				logger.Criticalf("Error on closing worker %v: %v", w, err)
 				return
-			} else {
-				w.close(conn)
-				PutConn(conn)
 			}
 		}()
 		for job := range jobs {
@@ -112,13 +129,10 @@ func (w *worker) work(jobs <-chan *Job, monitor *sync.WaitGroup) {
 				errorLog := fmt.Sprintf("No worker for %s in queue %s with args %v", job.Payload.Class, job.Queue, job.Payload.Args)
 				logger.Critical(errorLog)
 
-				conn, err := GetConn()
+				err := w.finish(client, job, errors.New(errorLog))
 				if err != nil {
-					logger.Criticalf("Error on getting connection in worker %v: %v", w, err)
+					logger.Criticalf("Error on finishing worker %v: %v", w, err)
 					return
-				} else {
-					w.finish(conn, job, errors.New(errorLog))
-					PutConn(conn)
 				}
 			}
 		}
@@ -127,29 +141,26 @@ func (w *worker) work(jobs <-chan *Job, monitor *sync.WaitGroup) {
 
 func (w *worker) run(job *Job, workerFunc workerFunc) {
 	var err error
+
 	defer func() {
-		conn, errCon := GetConn()
-		if errCon != nil {
-			logger.Criticalf("Error on getting connection in worker on finish %v: %v", w, errCon)
+		errFinish := w.finish(client, job, err)
+		if errFinish != nil {
+			logger.Criticalf("Error on finishing worker %v: %v", w, errFinish)
 			return
-		} else {
-			w.finish(conn, job, err)
-			PutConn(conn)
 		}
 	}()
+
 	defer func() {
 		if r := recover(); r != nil {
 			err = errors.New(fmt.Sprint(r))
 		}
 	}()
 
-	conn, err := GetConn()
-	if err != nil {
-		logger.Criticalf("Error on getting connection in worker on start %v: %v", w, err)
+	errStart := w.start(client, job)
+	if errStart != nil {
+		logger.Criticalf("Error on starting worker %v: %v", w, errStart)
 		return
-	} else {
-		w.start(conn, job)
-		PutConn(conn)
 	}
+
 	err = workerFunc(job.Queue, job.Payload.Args...)
 }
