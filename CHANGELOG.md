@@ -1,5 +1,12 @@
 ## [Unreleased]
 
+### Added
+
+- Added heartbeat and prune functions to clean stuck workers
+  ([Issue benmanns/goworker#65](https://github.com/benmanns/goworker/issues/65))
+
+### Changed
+
 - Moved from `redigo` to `go-redis` 
   ([Issue benmanns/goworker#69](https://github.com/benmanns/goworker/issues/69))
 
