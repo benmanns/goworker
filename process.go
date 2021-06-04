@@ -37,6 +37,7 @@ func (p *process) open(conn *RedisConn) error {
 	conn.Send("SADD", fmt.Sprintf("%sworkers", workerSettings.Namespace), p)
 	conn.Send("SET", fmt.Sprintf("%sstat:processed:%v", workerSettings.Namespace, p), "0")
 	conn.Send("SET", fmt.Sprintf("%sstat:failed:%v", workerSettings.Namespace, p), "0")
+	conn.Send("HSET", fmt.Sprintf("%s%s", workerSettings.Namespace, heartbeatKey), p, time.Now().Format(time.RFC3339))
 	conn.Flush()
 
 	return nil
@@ -47,6 +48,7 @@ func (p *process) close(conn *RedisConn) error {
 	conn.Send("SREM", fmt.Sprintf("%sworkers", workerSettings.Namespace), p)
 	conn.Send("DEL", fmt.Sprintf("%sstat:processed:%s", workerSettings.Namespace, p))
 	conn.Send("DEL", fmt.Sprintf("%sstat:failed:%s", workerSettings.Namespace, p))
+	conn.Send("HDEl", fmt.Sprintf("%s%s", workerSettings.Namespace, heartbeatKey), p)
 	conn.Flush()
 
 	return nil

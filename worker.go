@@ -4,12 +4,23 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 )
 
+const (
+	heartbeatInterval    = time.Minute
+	heartbeatKey         = "workers:heartbeat"
+	keyForWorkersPruning = "pruning_dead_workers_in_progress"
+	pruneInterval        = heartbeatInterval * 5
+)
+
 type worker struct {
 	process
+
+	heartbeatTicker *time.Ticker
 }
 
 func newWorker(id string, queues []string) (*worker, error) {
@@ -18,7 +29,8 @@ func newWorker(id string, queues []string) (*worker, error) {
 		return nil, err
 	}
 	return &worker{
-		process: *process,
+		process:         *process,
+		heartbeatTicker: time.NewTicker(heartbeatInterval),
 	}, nil
 }
 
@@ -42,6 +54,117 @@ func (w *worker) start(conn *RedisConn, job *Job) error {
 	logger.Debugf("Processing %s since %s [%v]", work.Queue, work.RunAt, work.Payload.Class)
 
 	return w.process.start(conn)
+}
+
+func (w *worker) startHeartbeat() {
+	go func() {
+		for {
+			select {
+			case <-w.heartbeatTicker.C:
+				conn, err := GetConn()
+				if err != nil {
+					logger.Criticalf("Error on getting connection in worker %v: %v", w, err)
+					return
+				}
+				conn.Send("HSET", fmt.Sprintf("%s%s", workerSettings.Namespace, heartbeatKey), w.process.String(), time.Now().Format(time.RFC3339))
+				PutConn(conn)
+			}
+		}
+	}()
+}
+
+func (w *worker) pruneDeadWorkers(conn *RedisConn) {
+	// Block with set+nx+ex
+	ok, err := conn.Do("SET", fmt.Sprintf("%s%s", workerSettings.Namespace, keyForWorkersPruning), w.String(), "EX", int(heartbeatInterval.Minutes()), "NX")
+	if err != nil {
+		logger.Criticalf("Error on setting lock to prune workers: %v", err)
+		return
+	}
+
+	if ok == nil {
+		return
+	}
+	// Get all workers
+	iworkers, err := conn.Do("SMEMBERS", fmt.Sprintf("%sworkers", workerSettings.Namespace))
+	if err != nil {
+		logger.Criticalf("Error on getting list of all workers: %v", err)
+		return
+	}
+
+	workers := make([]string, 0)
+	for _, m := range iworkers.([]interface{}) {
+		workers = append(workers, string(m.([]byte)))
+	}
+
+	// Get all workers that have sent a heartbeat and now is expired
+	iheartbeatWorkers, err := conn.Do("HGETALL", fmt.Sprintf("%s%s", workerSettings.Namespace, heartbeatKey))
+	if err != nil {
+		logger.Criticalf("Error on getting list of all workers with heartbeat: %v", err)
+		return
+	}
+
+	hearbeatExpiredWorkers := make(map[string]struct{})
+	var currentKey string
+	for i, m := range iheartbeatWorkers.([]interface{}) {
+		if i%2 == 0 {
+			currentKey = string(m.([]byte))
+		} else {
+			v := string(m.([]byte))
+			if v == "" {
+				continue
+			}
+
+			t, err := time.Parse(time.RFC3339, v)
+			if err != nil {
+				logger.Criticalf("Error on parsing the time of %q: %v", v, err)
+				return
+			}
+
+			if time.Since(t) > pruneInterval {
+				hearbeatExpiredWorkers[currentKey] = struct{}{}
+			}
+		}
+	}
+
+	// If a worker is on the expired list kill it
+	for _, w := range workers {
+		if _, ok := hearbeatExpiredWorkers[w]; ok {
+			logger.Infof("Pruning dead worker %q", w)
+
+			parts := strings.Split(w, ":")
+			pidAndID := strings.Split(parts[1], "-")
+			pid, _ := strconv.Atoi(pidAndID[0])
+			wp := process{
+				Hostname: parts[0],
+				Pid:      int(pid),
+				ID:       pidAndID[1],
+				Queues:   strings.Split(parts[2], ","),
+			}
+
+			iwork, err := conn.Do("GET", fmt.Sprintf("%sworker:%s", workerSettings.Namespace, wp.String()))
+			if err != nil {
+				logger.Criticalf("Error on getting worker work for pruning: %v", err)
+				return
+			}
+			if iwork != nil {
+				var work = work{}
+				err = json.Unmarshal(iwork.([]byte), &work)
+				if err != nil {
+					logger.Criticalf("Error unmarshaling worker job: %v", err)
+					return
+				}
+
+				// If it has a job flag it as failed
+				wk := worker{process: wp}
+				wk.fail(conn, &Job{
+					Queue:   work.Queue,
+					Payload: work.Payload,
+				}, fmt.Errorf("Worker %s did not gracefully exit while processing %s", wk.process.String(), work.Payload.Class))
+			}
+
+			wp.close(conn)
+		}
+	}
 }
 
 func (w *worker) fail(conn *RedisConn, job *Job, err error) error {
@@ -83,10 +206,20 @@ func (w *worker) work(jobs <-chan *Job, monitor *sync.WaitGroup) {
 	if err != nil {
 		logger.Criticalf("Error on getting connection in worker %v: %v", w, err)
 		return
-	} else {
-		w.open(conn)
-		PutConn(conn)
 	}
+	w.open(conn)
+	PutConn(conn)
+
+	w.startHeartbeat()
+	defer w.heartbeatTicker.Stop()
+
+	conn, err = GetConn()
+	if err != nil {
+		logger.Criticalf("Error on getting connection in worker %v: %v", w, err)
+		return
+	}
+	w.pruneDeadWorkers(conn)
+	PutConn(conn)
 
 	monitor.Add(1)
 
