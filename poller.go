@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"time"
+
+	"github.com/go-redis/redis/v7"
 )
 
 type poller struct {
@@ -23,20 +25,24 @@ func newPoller(queues []string, isStrict bool) (*poller, error) {
 	}, nil
 }
 
-func (p *poller) getJob(conn *RedisConn) (*Job, error) {
+func (p *poller) getJob(c *redis.Client) (*Job, error) {
 	for _, queue := range p.queues(p.isStrict) {
 		logger.Debugf("Checking %s", queue)
 
-		reply, err := conn.Do("LPOP", fmt.Sprintf("%squeue:%s", workerSettings.Namespace, queue))
+		result, err := c.LPop(fmt.Sprintf("%squeue:%s", workerSettings.Namespace, queue)).Result()
 		if err != nil {
+			// no jobs for now, continue on another queue
+			if err == redis.Nil {
+				continue
+			}
 			return nil, err
 		}
-		if reply != nil {
+		if result != "" {
 			logger.Debugf("Found job on %s", queue)
 
 			job := &Job{Queue: queue}
 
-			decoder := json.NewDecoder(bytes.NewReader(reply.([]byte)))
+			decoder := json.NewDecoder(bytes.NewReader([]byte(result)))
 			if workerSettings.UseNumber {
 				decoder.UseNumber()
 			}
@@ -52,31 +58,29 @@ func (p *poller) getJob(conn *RedisConn) (*Job, error) {
 }
 
 func (p *poller) poll(interval time.Duration, quit <-chan bool) (<-chan *Job, error) {
-	jobs := make(chan *Job)
-
-	conn, err := GetConn()
+	err := p.open(client)
 	if err != nil {
-		logger.Criticalf("Error on getting connection in poller %s: %v", p, err)
-		close(jobs)
 		return nil, err
-	} else {
-		p.open(conn)
-		p.start(conn)
-		PutConn(conn)
 	}
 
+	err = p.start(client)
+	if err != nil {
+		return nil, err
+	}
+
+	jobs := make(chan *Job)
 	go func() {
 		defer func() {
 			close(jobs)
 
-			conn, err := GetConn()
+			err = p.finish(client)
 			if err != nil {
-				logger.Criticalf("Error on getting connection in poller %s: %v", p, err)
 				return
-			} else {
-				p.finish(conn)
-				p.close(conn)
-				PutConn(conn)
+			}
+
+			err = p.close(client)
+			if err != nil {
+				return
 			}
 		}()
 
@@ -85,22 +89,17 @@ func (p *poller) poll(interval time.Duration, quit <-chan bool) (<-chan *Job, er
 			case <-quit:
 				return
 			default:
-				conn, err := GetConn()
+				job, err := p.getJob(client)
 				if err != nil {
-					logger.Criticalf("Error on getting connection in poller %s: %v", p, err)
-					return
-				}
-
-				job, err := p.getJob(conn)
-				if err != nil {
-					logger.Criticalf("Error on %v getting job from %v: %v", p, p.Queues, err)
-					PutConn(conn)
+					logger.Criticalf("Error on %v getting job from %v: %+v", p, p.Queues, err)
 					return
 				}
 				if job != nil {
-					conn.Send("INCR", fmt.Sprintf("%sstat:processed:%v", workerSettings.Namespace, p))
-					conn.Flush()
-					PutConn(conn)
+					err = client.Incr(fmt.Sprintf("%sstat:processed:%v", workerSettings.Namespace, p)).Err()
+					if err != nil {
+						return
+					}
+
 					select {
 					case jobs <- job:
 					case <-quit:
@@ -109,19 +108,15 @@ func (p *poller) poll(interval time.Duration, quit <-chan bool) (<-chan *Job, er
 							logger.Criticalf("Error requeueing %v: %v", job, err)
 							return
 						}
-						conn, err := GetConn()
+
+						err = client.LPush(fmt.Sprintf("%squeue:%s", workerSettings.Namespace, job.Queue), buf).Err()
 						if err != nil {
-							logger.Criticalf("Error on getting connection in poller %s: %v", p, err)
 							return
 						}
 
-						conn.Send("LPUSH", fmt.Sprintf("%squeue:%s", workerSettings.Namespace, job.Queue), buf)
-						conn.Flush()
-						PutConn(conn)
 						return
 					}
 				} else {
-					PutConn(conn)
 					if workerSettings.ExitOnComplete {
 						return
 					}
