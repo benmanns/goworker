@@ -1,5 +1,12 @@
 ## [Unreleased]
 
+## [0.1.6] _2021-06-08_
+
+### Changed
+
+- Change the module definition from `github.com/benmanns/goworker` to `github.com/cycloidio/goworker`
+  ([PR #3](https://github.com/cycloidio/goworker/pull/3))
+
 ## [0.1.5] _2021-06-08_
 
 ### Added
