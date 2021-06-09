@@ -1,9 +1,11 @@
 ## [Unreleased]
 
+## [0.1.7] _2021-06-09_
+
 ### Fixed
 
 - Solved error when trying to prune workers with `go-redis`
-  ([PR #5](https://github.com/cycloidio/goworker/pull/5))
+  ([PR #4](https://github.com/cycloidio/goworker/pull/4))
 
 ## [0.1.6] _2021-06-08_
 
