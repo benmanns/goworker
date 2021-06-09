@@ -135,7 +135,7 @@ func (w *worker) pruneDeadWorkers(c *redis.Client) {
 			}
 
 			bwork, err := c.Get(fmt.Sprintf("%sworker:%s", workerSettings.Namespace, wp.String())).Bytes()
-			if err != nil {
+			if err != nil && err != redis.Nil {
 				logger.Criticalf("Error on getting worker work for pruning: %v", err)
 				return
 			}
