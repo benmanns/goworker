@@ -41,6 +41,8 @@ type WorkerSettings struct {
 	UseNumber      bool
 	SkipTLSVerify  bool
 	TLSCertPath    string
+
+	closed chan struct{}
 }
 
 func SetSettings(settings WorkerSettings) {
@@ -88,6 +90,8 @@ func Init() error {
 			return err
 		}
 
+		workerSettings.closed = make(chan struct{})
+
 		initialized = true
 	}
 
@@ -123,9 +127,17 @@ func Close() error {
 			return err
 		}
 		initialized = false
+		close(workerSettings.closed)
 	}
 
 	return nil
+}
+
+// Closed will return a channel that will be
+// closed once the full process is done closing
+// and cleaning all the workers
+func Closed() <-chan struct{} {
+	return workerSettings.closed
 }
 
 // Work starts the goworker process. Check for errors in

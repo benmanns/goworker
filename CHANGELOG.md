@@ -1,5 +1,10 @@
 ## [Unreleased]
 
+### Added
+
+- Closed function to be able to wait for the workers to fully finish
+  ([PR #6](https://github.com/cycloidio/goworker/issues/6))
+
 ## [0.1.7] _2021-06-09_
 
 ### Fixed
