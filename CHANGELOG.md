@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+## [0.1.8] _2021-06-11_
+
 ### Added
 
 - Closed function to be able to wait for the workers to fully finish
