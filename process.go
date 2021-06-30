@@ -51,6 +51,7 @@ func (p *process) open(c *redis.Client) error {
 		return err
 	}
 
+	// We set the heartbeat as the first thing
 	err = c.HSet(fmt.Sprintf("%s%s", workerSettings.Namespace, heartbeatKey), p.String(), time.Now().Format(time.RFC3339)).Err()
 	if err != nil {
 		return err

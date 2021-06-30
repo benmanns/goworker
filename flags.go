@@ -83,6 +83,13 @@
 // specified max age/duration (time.Duration).
 // By default is disabled if enabled it'll
 // check every 1m for old retries.
+// -force-prune=false
+// — Will prune all workers that are not inside
+// of the heartbeat set, not just the expired ones.
+// This option is not compatible with older
+// versions of Resque (any port) as older versions
+// may not have heartbeat so this would delete
+// real working workers.
 //
 // You can also configure your own flags for use
 // within your workers. Be sure to set them
@@ -137,6 +144,8 @@ func init() {
 	flag.BoolVar(&workerSettings.SkipTLSVerify, "insecure-tls", false, "skip TLS validation")
 
 	flag.DurationVar(&workerSettings.MaxAgeRetries, "max-age-retries", 0, "max age of the retried failed jobs before cleaning them")
+
+	flag.BoolVar(&workerSettings.ForcePrune, "force-prune", false, "Forced the deletion of workers that are not present on the heartbeat set. WARNING: This is not compatible with older versions of Resque (any port) that do not have heartbeat as it'll then delete working workers.")
 }
 
 func flags() error {

@@ -51,6 +51,7 @@ type WorkerSettings struct {
 	SkipTLSVerify  bool
 	TLSCertPath    string
 	MaxAgeRetries  time.Duration
+	ForcePrune     bool
 
 	closed chan struct{}
 }
@@ -174,14 +175,24 @@ func Work() error {
 	}
 
 	var monitor sync.WaitGroup
+	var wk *worker
 
 	for id := 0; id < workerSettings.Concurrency; id++ {
 		worker, err := newWorker(strconv.Itoa(id), workerSettings.Queues)
 		if err != nil {
 			return err
 		}
+		if wk != nil {
+			wk = worker
+		}
 		worker.work(jobs, &monitor)
 	}
+
+	// Once all the workers have started we prune the dead ones
+	// this way we prevent from pruning workers that have just
+	// started and not registered to the Heartbeat in case
+	// of ForcePrune is enabled.
+	wk.pruneDeadWorkers(client)
 
 	if hasToCleanRetries() {
 		cleanExpiredRetryTicker := time.NewTicker(cleaningExpiredRetriesInterval)
