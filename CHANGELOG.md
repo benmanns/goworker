@@ -1,5 +1,10 @@
 ## [Unreleased]
 
+### Added
+
+- Flag `-max-age-retries` to remove retried failed jobs after that duration
+  ([PR #9](https://github.com/cycloidio/goworker/pull/9))
+
 ## [0.1.8] _2021-06-11_
 
 ### Added

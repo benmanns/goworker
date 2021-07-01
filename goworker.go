@@ -3,6 +3,7 @@ package goworker
 import (
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -25,6 +26,14 @@ var (
 	initialized bool
 )
 
+const (
+	keyForCleaningExpiredRetries = "cleaning_expired_retried_in_progress"
+)
+
+var (
+	cleaningExpiredRetriesInterval = time.Minute
+)
+
 var workerSettings WorkerSettings
 
 type WorkerSettings struct {
@@ -41,6 +50,7 @@ type WorkerSettings struct {
 	UseNumber      bool
 	SkipTLSVerify  bool
 	TLSCertPath    string
+	MaxAgeRetries  time.Duration
 
 	closed chan struct{}
 }
@@ -173,7 +183,75 @@ func Work() error {
 		worker.work(jobs, &monitor)
 	}
 
+	if hasToCleanRetries() {
+		cleanExpiredRetryTicker := time.NewTicker(cleaningExpiredRetriesInterval)
+		waitChan := make(chan struct{})
+		go func() {
+			monitor.Wait()
+			close(waitChan)
+		}()
+		for {
+			select {
+			case <-cleanExpiredRetryTicker.C:
+				cleanExpiredRetries()
+			case <-waitChan:
+				cleanExpiredRetryTicker.Stop()
+				return nil
+			}
+		}
+	}
+
 	monitor.Wait()
 
 	return nil
+}
+
+func hasToCleanRetries() bool {
+	return workerSettings.MaxAgeRetries != 0
+}
+
+func cleanExpiredRetries() {
+	// This is used to set a lock so this operation is not done by more than 1 worker at the same time
+	ok, err := client.SetNX(fmt.Sprintf("%s%s", workerSettings.Namespace, keyForCleaningExpiredRetries), os.Getpid(), cleaningExpiredRetriesInterval/2).Result()
+	if err != nil {
+		logger.Criticalf("Error on setting lock to clean retries: %v", err)
+		return
+	}
+
+	if !ok {
+		return
+	}
+
+	failures, err := client.LRange(fmt.Sprintf("%sfailed", workerSettings.Namespace), 0, -1).Result()
+	if err != nil {
+		logger.Criticalf("Error on getting list of all failed jobs: %v", err)
+		return
+	}
+
+	for i, fail := range failures {
+		var f failure
+		err = json.Unmarshal([]byte(fail), &f)
+		if err != nil {
+			logger.Criticalf("Error on unmarshaling failure: %v", err)
+			return
+		}
+		ra, err := f.GetRetriedAtTime()
+		if err != nil {
+			logger.Criticalf("Error on GetRetriedAtTime of failure job %q: %v", fail, err)
+			return
+		}
+		if ra == *new(time.Time) {
+			continue
+		}
+
+		// If the RetryAt has exceeded the MaxAgeRetries then we'll
+		// remove the job from the list of failed jobs
+		if ra.Add(workerSettings.MaxAgeRetries).Before(time.Now()) {
+			hopefullyUniqueValueWeCanUseToDeleteJob := ""
+			// This logic what it does it replace first the value (with the LSet) and then remove the first
+			// occurrence on the failed queue of the replaced value. This value is the 'hopefullyUniqueValueWeCanUseToDeleteJob'
+			client.LSet(fmt.Sprintf("%sfailed", workerSettings.Namespace), int64(i), hopefullyUniqueValueWeCanUseToDeleteJob)
+			client.LRem(fmt.Sprintf("%sfailed", workerSettings.Namespace), 1, hopefullyUniqueValueWeCanUseToDeleteJob)
+		}
+	}
 }

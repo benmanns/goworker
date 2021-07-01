@@ -36,8 +36,26 @@ func newWorker(id string, queues []string) (*worker, error) {
 	}, nil
 }
 
+// MarshalJSON marshals the worker into a []byte
 func (w *worker) MarshalJSON() ([]byte, error) {
 	return json.Marshal(w.String())
+}
+
+// UnmarshalJSON converts the b into a woker
+func (w *worker) UnmarshalJSON(b []byte) error {
+	s := string(b)
+	parts := strings.Split(s, ":")
+	pidAndID := strings.Split(parts[1], "-")
+	pid, _ := strconv.Atoi(pidAndID[0])
+	w = &worker{
+		process: process{
+			Hostname: parts[0],
+			Pid:      int(pid),
+			ID:       pidAndID[1],
+			Queues:   strings.Split(parts[2], ","),
+		},
+	}
+	return nil
 }
 
 func (w *worker) start(c *redis.Client, job *Job) error {
@@ -162,13 +180,13 @@ func (w *worker) pruneDeadWorkers(c *redis.Client) {
 
 func (w *worker) fail(c *redis.Client, job *Job, err error) error {
 	failure := &failure{
-		FailedAt:  time.Now(),
 		Payload:   job.Payload,
 		Exception: "Error",
 		Error:     err.Error(),
 		Worker:    w,
 		Queue:     job.Queue,
 	}
+	failure.SetFailedAt(time.Now())
 	buffer, err := json.Marshal(failure)
 	if err != nil {
 		return err
