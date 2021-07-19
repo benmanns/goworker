@@ -77,6 +77,13 @@
 // encoded in scientific notation, losing
 // pecision. This will default to true soon.
 //
+// -max-age-retries=1s
+// — This flag will enable a feature to automatically
+// clean the retried failed jobs older than the
+// specified max age/duration (time.Duration).
+// By default is disabled if enabled it'll
+// check every 1m for old retries.
+//
 // You can also configure your own flags for use
 // within your workers. Be sure to set them
 // before calling goworker.Main(). It is okay to
@@ -128,6 +135,8 @@ func init() {
 	flag.BoolVar(&workerSettings.UseNumber, "use-number", false, "use json.Number instead of float64 when decoding numbers in JSON. will default to true soon")
 
 	flag.BoolVar(&workerSettings.SkipTLSVerify, "insecure-tls", false, "skip TLS validation")
+
+	flag.DurationVar(&workerSettings.MaxAgeRetries, "max-age-retries", 0, "max age of the retried failed jobs before cleaning them")
 }
 
 func flags() error {
