@@ -139,7 +139,13 @@ func (w *worker) pruneDeadWorkers(c *redis.Client) {
 
 	// If a worker is on the expired list kill it
 	for _, w := range workers {
-		if _, ok := hearbeatExpiredWorkers[w]; ok {
+		_, hbeok := hearbeatExpiredWorkers[w]
+		_, hbok := heartbeatWorkers[w]
+		// We want to prune workers that:
+		// * Are expired
+		// * Are not on the heartbeat set and ForcePrune is set
+		// If they are neither of those then we do not want to expire them
+		if hbeok || (!hbok && workerSettings.ForcePrune) {
 			logger.Infof("Pruning dead worker %q", w)
 
 			parts := strings.Split(w, ":")
@@ -238,8 +244,6 @@ func (w *worker) work(jobs <-chan *Job, monitor *sync.WaitGroup) {
 
 	w.startHeartbeat(client)
 	defer w.heartbeatTicker.Stop()
-
-	w.pruneDeadWorkers(client)
 
 	monitor.Add(1)
 

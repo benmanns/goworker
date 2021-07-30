@@ -4,13 +4,15 @@
 
 - Flag `-max-age-retries` to remove retried failed jobs after that duration
   ([PR #9](https://github.com/cycloidio/goworker/pull/9))
+- New flag `-force-prune` to remove workers not on the heartbeat list
+  ([PR #8](https://github.com/cycloidio/goworker/pull/8))
 
 ## [0.1.8] _2021-06-11_
 
 ### Added
 
 - Closed function to be able to wait for the workers to fully finish
-  ([PR #6](https://github.com/cycloidio/goworker/issues/6))
+  ([PR #6](https://github.com/cycloidio/goworker/pull/6))
 
 ## [0.1.7] _2021-06-09_
 
