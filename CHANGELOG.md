@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+## [0.1.9] _2021-07-30_
+
 ### Added
 
 - Flag `-max-age-retries` to remove retried failed jobs after that duration
