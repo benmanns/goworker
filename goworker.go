@@ -182,7 +182,7 @@ func Work() error {
 		if err != nil {
 			return err
 		}
-		if wk != nil {
+		if wk == nil {
 			wk = worker
 		}
 		worker.work(jobs, &monitor)

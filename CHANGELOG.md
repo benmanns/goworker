@@ -1,5 +1,12 @@
 ## [Unreleased]
 
+## [0.1.10] _2021-08-26_
+
+### Fixed
+
+- Nil pointer fixed when executing the workers
+  ([PR #11](https://github.com/cycloidio/goworker/pull/11))
+
 ## [0.1.9] _2021-07-30_
 
 ### Added
