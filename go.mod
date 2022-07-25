@@ -1,6 +1,6 @@
-module github.com/benmanns/goworker
+module github.com/skaurus/goworker
 
-go 1.14
+go 1.18
 
 require (
 	github.com/cihub/seelog v0.0.0-20140730094913-72ae425987bc
