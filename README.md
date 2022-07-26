@@ -14,6 +14,7 @@ goworker workers can run alongside Ruby Resque clients so that you can keep all 
 This is a fork of a [bennmans' library goworker](https://github.com/benmanns/goworker). I integrated here work from:
 - [Jberlinsky](https://github.com/benmanns/goworker/pull/62) on reporting error stacks to failed queue (replacing lib used to produce stacks)
 - [kerak19](https://github.com/benmanns/goworker/pull/85) on replacing redis.go with go-redis (but using v9 instead of v7)
+- updated example in README to use correct parameter IntervalFloat instead of Interval which gets overwritten later
 - ...
 
 ## Installation
@@ -126,7 +127,7 @@ func init() {
 		ExitOnComplete: false,
 		Concurrency:    2,
 		Namespace:      "resque:",
-		Interval:       5.0,
+		IntervalFloat:  5.0,
 	}
 	goworker.SetSettings(settings)
 	goworker.Register("MyClass", myFunc)
@@ -204,7 +205,7 @@ goworker.Enqueue(&goworker.Job{
 There are several flags which control the operation of the goworker client.
 
 * `-queues="comma,delimited,queues"` — This is the only required flag. The recommended practice is to separate your Resque workers from your goworkers with different queues. Otherwise, Resque worker classes that have no goworker analog will cause the goworker process to fail the jobs. Because of this, there is no default queue, nor is there a way to select all queues (à la Resque's `*` queue). If you have multiple queues you can assign them weights. A queue with a weight of 2 will be checked twice as often as a queue with a weight of 1: `-queues='high=2,low=1'`.
-* `-interval=5.0` — Specifies the wait period between polling if no job was in the queue the last time one was requested.
+* `-interval=5.0` — Specifies the wait period between polling in seconds if no job was in the queue the last time one was requested.
 * `-concurrency=25` — Specifies the number of concurrently executing workers. This number can be as low as 1 or rather comfortably as high as 100,000, and should be tuned to your workflow and the availability of outside resources.
 * `-connections=2` — Specifies the maximum number of Redis connections that goworker will consume between the poller and all workers. There is not much performance gain over two and a slight penalty when using only one. This is configurable in case you need to keep connection counts low for cloud Redis providers who limit plans on `maxclients`.
 * `-uri=redis://localhost:6379/` — Specifies the URI of the Redis database from which goworker polls for jobs. Accepts URIs of the format `redis://user:pass@host:port/db` or `unix:///path/to/redis.sock`. The flag may also be set by the environment variable `$($REDIS_PROVIDER)` or `$REDIS_URL`. E.g. set `$REDIS_PROVIDER` to `REDISTOGO_URL` on Heroku to let the Redis To Go add-on configure the Redis database.
