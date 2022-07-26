@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/go-redis/redis/v9"
+	"github.com/pkg/errors"
 )
 
 type poller struct {
@@ -60,12 +61,12 @@ func (p *poller) getJob(c *redis.Client) (*Job, error) {
 func (p *poller) poll(interval time.Duration, quit <-chan bool) (<-chan *Job, error) {
 	err := p.open(client)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	err = p.start(client)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	jobs := make(chan *Job)
@@ -75,11 +76,15 @@ func (p *poller) poll(interval time.Duration, quit <-chan bool) (<-chan *Job, er
 
 			err = p.finish(client)
 			if err != nil {
+				err = errors.WithStack(err)
+				logger.Criticalf("Error on %v finishing working on %v: %+v", p, p.Queues, err)
 				return
 			}
 
 			err = p.close(client)
 			if err != nil {
+				err = errors.WithStack(err)
+				logger.Criticalf("Error on %v closing client on %v: %+v", p, p.Queues, err)
 				return
 			}
 		}()
@@ -91,12 +96,15 @@ func (p *poller) poll(interval time.Duration, quit <-chan bool) (<-chan *Job, er
 			default:
 				job, err := p.getJob(client)
 				if err != nil {
+					err = errors.WithStack(err)
 					logger.Criticalf("Error on %v getting job from %v: %+v", p, p.Queues, err)
 					return
 				}
 				if job != nil {
 					err = client.Incr(client.Context(), fmt.Sprintf("%sstat:processed:%v", workerSettings.Namespace, p)).Err()
 					if err != nil {
+						err = errors.WithStack(err)
+						logger.Errorf("Error on %v incrementing stat on %v: %+v", p, p.Queues, err)
 						return
 					}
 
@@ -105,12 +113,15 @@ func (p *poller) poll(interval time.Duration, quit <-chan bool) (<-chan *Job, er
 					case <-quit:
 						buf, err := json.Marshal(job.Payload)
 						if err != nil {
+							err = errors.WithStack(err)
 							logger.Criticalf("Error requeueing %v: %v", job, err)
 							return
 						}
 
 						err = client.LPush(client.Context(), fmt.Sprintf("%squeue:%s", workerSettings.Namespace, job.Queue), buf).Err()
 						if err != nil {
+							err = errors.WithStack(err)
+							logger.Criticalf("Error requeueing %v: %v", job, err)
 							return
 						}
 

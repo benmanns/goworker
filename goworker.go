@@ -144,7 +144,7 @@ func Work() error {
 
 	poller, err := newPoller(workerSettings.Queues, workerSettings.IsStrict)
 	if err != nil {
-		return err
+		return err // it will be error only if os.Hostname() fails
 	}
 	jobs, err := poller.poll(time.Duration(workerSettings.Interval), quit)
 	if err != nil {
@@ -156,7 +156,7 @@ func Work() error {
 	for id := 0; id < workerSettings.Concurrency; id++ {
 		worker, err := newWorker(strconv.Itoa(id), workerSettings.Queues)
 		if err != nil {
-			return err
+			return err // it will be error only if os.Hostname() fails
 		}
 		worker.work(jobs, &monitor)
 	}

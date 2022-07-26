@@ -51,6 +51,11 @@ func (p *process) open(c *redis.Client) error {
 		return err
 	}
 
+	err = c.HSet(c.Context(), fmt.Sprintf("%s%s", workerSettings.Namespace, heartbeatKey), p.String(), time.Now().Format(time.RFC3339)).Err()
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -67,6 +72,11 @@ func (p *process) close(c *redis.Client) error {
 	}
 
 	err = c.Del(c.Context(), fmt.Sprintf("%sstat:failed:%s", workerSettings.Namespace, p)).Err()
+	if err != nil {
+		return err
+	}
+
+	err = c.HDel(c.Context(), fmt.Sprintf("%s%s", workerSettings.Namespace, heartbeatKey), p.String()).Err()
 	if err != nil {
 		return err
 	}

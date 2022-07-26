@@ -15,6 +15,9 @@ This is a fork of a [bennmans' library goworker](https://github.com/benmanns/gow
 - [Jberlinsky](https://github.com/benmanns/goworker/pull/62) on reporting error stacks to failed queue (replacing lib used to produce stacks)
 - [kerak19](https://github.com/benmanns/goworker/pull/85) on replacing redis.go with go-redis (but using v9 instead of v7)
 - updated example in README to use correct parameter IntervalFloat instead of Interval which gets overwritten later
+- [FrankChung](https://github.com/benmanns/goworker/pull/46) to prevent overwriting WorkerSettings
+- [cthulhu](https://github.com/benmanns/goworker/pull/56)
+- [xescugc](https://github.com/benmanns/goworker/pull/87) to add heartbeats
 - ...
 
 ## Installation
