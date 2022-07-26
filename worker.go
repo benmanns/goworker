@@ -2,12 +2,12 @@ package goworker
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"sync"
 	"time"
 
 	"github.com/go-redis/redis/v9"
+	"github.com/pkg/errors"
 )
 
 type worker struct {
@@ -55,9 +55,10 @@ func (w *worker) fail(c *redis.Client, job *Job, err error) error {
 		FailedAt:  time.Now(),
 		Payload:   job.Payload,
 		Exception: "Error",
-		Error:     err.Error(),
-		Worker:    w,
-		Queue:     job.Queue,
+		// %+v for errors with stack produces stack with file and method names and line numbers
+		Error:  fmt.Sprintf("%+v", err),
+		Worker: w,
+		Queue:  job.Queue,
 	}
 	buffer, err := json.Marshal(failure)
 	if err != nil {
@@ -88,9 +89,9 @@ func (w *worker) succeed(c *redis.Client) error {
 
 func (w *worker) finish(c *redis.Client, job *Job, err error) error {
 	if err != nil {
-		err = w.fail(c, job, err)
+		err = w.fail(c, job, errors.WithStack(err))
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 	} else {
 		err = w.succeed(c)
