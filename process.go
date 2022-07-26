@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/go-redis/redis/v7"
+	"github.com/go-redis/redis/v9"
 )
 
 type process struct {
@@ -36,17 +36,17 @@ func (p *process) String() string {
 }
 
 func (p *process) open(c *redis.Client) error {
-	err := c.SAdd(fmt.Sprintf("%sworkers", workerSettings.Namespace), p.String()).Err()
+	err := c.SAdd(c.Context(), fmt.Sprintf("%sworkers", workerSettings.Namespace), p.String()).Err()
 	if err != nil {
 		return err
 	}
 
-	err = c.Set(fmt.Sprintf("%sstat:processed:%v", workerSettings.Namespace, p), "0", 0).Err()
+	err = c.Set(c.Context(), fmt.Sprintf("%sstat:processed:%v", workerSettings.Namespace, p), "0", 0).Err()
 	if err != nil {
 		return err
 	}
 
-	err = c.Set(fmt.Sprintf("%sstat:failed:%v", workerSettings.Namespace, p), "0", 0).Err()
+	err = c.Set(c.Context(), fmt.Sprintf("%sstat:failed:%v", workerSettings.Namespace, p), "0", 0).Err()
 	if err != nil {
 		return err
 	}
@@ -56,17 +56,17 @@ func (p *process) open(c *redis.Client) error {
 
 func (p *process) close(c *redis.Client) error {
 	logger.Infof("%v shutdown", p)
-	err := c.SRem(fmt.Sprintf("%sworkers", workerSettings.Namespace), p.String()).Err()
+	err := c.SRem(c.Context(), fmt.Sprintf("%sworkers", workerSettings.Namespace), p.String()).Err()
 	if err != nil {
 		return err
 	}
 
-	err = c.Del(fmt.Sprintf("%sstat:processed:%s", workerSettings.Namespace, p)).Err()
+	err = c.Del(c.Context(), fmt.Sprintf("%sstat:processed:%s", workerSettings.Namespace, p)).Err()
 	if err != nil {
 		return err
 	}
 
-	err = c.Del(fmt.Sprintf("%sstat:failed:%s", workerSettings.Namespace, p)).Err()
+	err = c.Del(c.Context(), fmt.Sprintf("%sstat:failed:%s", workerSettings.Namespace, p)).Err()
 	if err != nil {
 		return err
 	}
@@ -75,7 +75,7 @@ func (p *process) close(c *redis.Client) error {
 }
 
 func (p *process) start(c *redis.Client) error {
-	err := c.Set(fmt.Sprintf("%sworker:%s:started", workerSettings.Namespace, p), time.Now().String(), 0).Err()
+	err := c.Set(c.Context(), fmt.Sprintf("%sworker:%s:started", workerSettings.Namespace, p), time.Now().String(), 0).Err()
 	if err != nil {
 		return err
 	}
@@ -84,12 +84,12 @@ func (p *process) start(c *redis.Client) error {
 }
 
 func (p *process) finish(c *redis.Client) error {
-	err := c.Del(fmt.Sprintf("%sworker:%s", workerSettings.Namespace, p)).Err()
+	err := c.Del(c.Context(), fmt.Sprintf("%sworker:%s", workerSettings.Namespace, p)).Err()
 	if err != nil {
 		return err
 	}
 
-	err = c.Del(fmt.Sprintf("%sworker:%s:started", workerSettings.Namespace, p)).Err()
+	err = c.Del(c.Context(), fmt.Sprintf("%sworker:%s:started", workerSettings.Namespace, p)).Err()
 	if err != nil {
 		return err
 	}
@@ -98,12 +98,12 @@ func (p *process) finish(c *redis.Client) error {
 }
 
 func (p *process) fail(c *redis.Client) error {
-	err := c.Incr(fmt.Sprintf("%sstat:failed", workerSettings.Namespace)).Err()
+	err := c.Incr(c.Context(), fmt.Sprintf("%sstat:failed", workerSettings.Namespace)).Err()
 	if err != nil {
 		return err
 	}
 
-	err = c.Incr(fmt.Sprintf("%sstat:failed:%s", workerSettings.Namespace, p)).Err()
+	err = c.Incr(c.Context(), fmt.Sprintf("%sstat:failed:%s", workerSettings.Namespace, p)).Err()
 	if err != nil {
 		return err
 	}

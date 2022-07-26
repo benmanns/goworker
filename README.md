@@ -9,6 +9,13 @@ goworker is a Resque-compatible, Go-based background worker. It allows you to pu
 
 goworker workers can run alongside Ruby Resque clients so that you can keep all but your most resource-intensive jobs in Ruby.
 
+## Introduction
+
+This is a fork of a [bennmans' library goworker](https://github.com/benmanns/goworker). I integrated here work from:
+- [Jberlinsky](https://github.com/benmanns/goworker/pull/62) on reporting error stacks to failed queue (replacing lib used to produce stacks)
+- [kerak19](https://github.com/benmanns/goworker/pull/85) on replacing redis.go with go-redis (but using v9 instead of v7)
+- ...
+
 ## Installation
 
 To install goworker, use

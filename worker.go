@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/go-redis/redis/v7"
+	"github.com/go-redis/redis/v9"
 )
 
 type worker struct {
@@ -40,7 +40,7 @@ func (w *worker) start(c *redis.Client, job *Job) error {
 		return err
 	}
 
-	err = c.Set(fmt.Sprintf("%sworker:%s", workerSettings.Namespace, w), buffer, 0).Err()
+	err = c.Set(c.Context(), fmt.Sprintf("%sworker:%s", workerSettings.Namespace, w), buffer, 0).Err()
 	if err != nil {
 		return err
 	}
@@ -64,7 +64,7 @@ func (w *worker) fail(c *redis.Client, job *Job, err error) error {
 		return err
 	}
 
-	err = c.RPush(fmt.Sprintf("%sfailed", workerSettings.Namespace), buffer).Err()
+	err = c.RPush(c.Context(), fmt.Sprintf("%sfailed", workerSettings.Namespace), buffer).Err()
 	if err != nil {
 		return err
 	}
@@ -73,12 +73,12 @@ func (w *worker) fail(c *redis.Client, job *Job, err error) error {
 }
 
 func (w *worker) succeed(c *redis.Client) error {
-	err := c.Incr(fmt.Sprintf("%sstat:processed", workerSettings.Namespace)).Err()
+	err := c.Incr(c.Context(), fmt.Sprintf("%sstat:processed", workerSettings.Namespace)).Err()
 	if err != nil {
 		return err
 	}
 
-	err = c.Incr(fmt.Sprintf("%sstat:processed:%s", workerSettings.Namespace, w)).Err()
+	err = c.Incr(c.Context(), fmt.Sprintf("%sstat:processed:%s", workerSettings.Namespace, w)).Err()
 	if err != nil {
 		return err
 	}

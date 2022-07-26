@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/go-redis/redis/v7"
+	"github.com/go-redis/redis/v9"
 )
 
 type poller struct {
@@ -29,7 +29,7 @@ func (p *poller) getJob(c *redis.Client) (*Job, error) {
 	for _, queue := range p.queues(p.isStrict) {
 		logger.Debugf("Checking %s", queue)
 
-		result, err := c.LPop(fmt.Sprintf("%squeue:%s", workerSettings.Namespace, queue)).Result()
+		result, err := c.LPop(c.Context(), fmt.Sprintf("%squeue:%s", workerSettings.Namespace, queue)).Result()
 		if err != nil {
 			// no jobs for now, continue on another queue
 			if err == redis.Nil {
@@ -95,7 +95,7 @@ func (p *poller) poll(interval time.Duration, quit <-chan bool) (<-chan *Job, er
 					return
 				}
 				if job != nil {
-					err = client.Incr(fmt.Sprintf("%sstat:processed:%v", workerSettings.Namespace, p)).Err()
+					err = client.Incr(client.Context(), fmt.Sprintf("%sstat:processed:%v", workerSettings.Namespace, p)).Err()
 					if err != nil {
 						return
 					}
@@ -109,7 +109,7 @@ func (p *poller) poll(interval time.Duration, quit <-chan bool) (<-chan *Job, er
 							return
 						}
 
-						err = client.LPush(fmt.Sprintf("%squeue:%s", workerSettings.Namespace, job.Queue), buf).Err()
+						err = client.LPush(client.Context(), fmt.Sprintf("%squeue:%s", workerSettings.Namespace, job.Queue), buf).Err()
 						if err != nil {
 							return
 						}

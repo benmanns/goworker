@@ -10,11 +10,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/go-redis/redis/v7"
-
-	"golang.org/x/net/context"
-
 	"github.com/cihub/seelog"
+	"github.com/go-redis/redis/v9"
+	"golang.org/x/net/context"
 )
 
 var (
@@ -83,7 +81,7 @@ func Init() error {
 		}
 
 		client = redis.NewClient(opts).WithContext(ctx)
-		err = client.Ping().Err()
+		err = client.Ping(client.Context()).Err()
 		if err != nil {
 			return err
 		}
