@@ -4,8 +4,8 @@ go 1.18
 
 require (
 	github.com/cihub/seelog v0.0.0-20170130134532-f561c5e57575
-	github.com/go-redis/redis/v9 v9.0.0-beta.1
-	golang.org/x/net v0.0.0-20220225172249-27dd8689420f
+	github.com/go-redis/redis/v9 v9.0.0-beta.2
+	golang.org/x/net v0.0.0-20220425223048-2871e0cb64e4
 )
 
 require (
