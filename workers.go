@@ -1,6 +1,7 @@
 package goworker
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 )
@@ -33,13 +34,13 @@ func Enqueue(job *Job) error {
 		return err
 	}
 
-	err = client.RPush(client.Context(), fmt.Sprintf("%squeue:%s", workerSettings.Namespace, job.Queue), buffer).Err()
+	err = client.RPush(context.Background(), fmt.Sprintf("%squeue:%s", workerSettings.Namespace, job.Queue), buffer).Err()
 	if err != nil {
 		_ = logger.Criticalf("Cant push to queue")
 		return err
 	}
 
-	err = client.SAdd(client.Context(), fmt.Sprintf("%squeues", workerSettings.Namespace), job.Queue).Err()
+	err = client.SAdd(context.Background(), fmt.Sprintf("%squeues", workerSettings.Namespace), job.Queue).Err()
 	if err != nil {
 		_ = logger.Criticalf("Cant register queue to list of use queues")
 		return err

@@ -1,6 +1,7 @@
 package goworker
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
@@ -12,7 +13,6 @@ import (
 
 	"github.com/cihub/seelog"
 	"github.com/go-redis/redis/v9"
-	"golang.org/x/net/context"
 )
 
 var (
@@ -82,8 +82,8 @@ func Init() error {
 			}
 		}
 
-		client = redis.NewClient(opts).WithContext(ctx)
-		err = client.Ping(client.Context()).Err()
+		client = redis.NewClient(opts)
+		err = client.Ping(ctx).Err()
 		if err != nil {
 			return err
 		}

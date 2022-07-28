@@ -2,6 +2,7 @@ package goworker
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"time"
@@ -30,7 +31,7 @@ func (p *poller) getJob(c *redis.Client) (*Job, error) {
 	for _, queue := range p.queues(p.isStrict) {
 		logger.Debugf("Checking %s", queue)
 
-		result, err := c.LPop(c.Context(), fmt.Sprintf("%squeue:%s", workerSettings.Namespace, queue)).Result()
+		result, err := c.LPop(context.Background(), fmt.Sprintf("%squeue:%s", workerSettings.Namespace, queue)).Result()
 		if err != nil {
 			// no jobs for now, continue on another queue
 			if err == redis.Nil {
@@ -101,7 +102,7 @@ func (p *poller) poll(interval time.Duration, quit <-chan bool) (<-chan *Job, er
 					return
 				}
 				if job != nil {
-					err = client.Incr(client.Context(), fmt.Sprintf("%sstat:processed:%v", workerSettings.Namespace, p)).Err()
+					err = client.Incr(context.Background(), fmt.Sprintf("%sstat:processed:%v", workerSettings.Namespace, p)).Err()
 					if err != nil {
 						err = errors.WithStack(err)
 						_ = logger.Errorf("Error on %v incrementing stat on %v: %+v", p, p.Queues, err)
@@ -118,7 +119,7 @@ func (p *poller) poll(interval time.Duration, quit <-chan bool) (<-chan *Job, er
 							return
 						}
 
-						err = client.LPush(client.Context(), fmt.Sprintf("%squeue:%s", workerSettings.Namespace, job.Queue), buf).Err()
+						err = client.LPush(context.Background(), fmt.Sprintf("%squeue:%s", workerSettings.Namespace, job.Queue), buf).Err()
 						if err != nil {
 							err = errors.WithStack(err)
 							_ = logger.Criticalf("Error requeueing %v: %v", job, err)
