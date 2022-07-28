@@ -19,6 +19,7 @@ This is a fork of a [bennmans' library goworker](https://github.com/benmanns/gow
 - [cthulhu](https://github.com/benmanns/goworker/pull/56) to... I didn't quite figure out what was happening without this PR, to be honest
 - [xescugc](https://github.com/benmanns/goworker/pull/87) to add heartbeats
 - [clalimarmo](https://github.com/benmanns/goworker/pull/7) to enable cleanup of closure resources
+- my own changed to get rid of some warnings, mostly about unhandled error from `logger.Criticalf`
 
 ## Installation
 
