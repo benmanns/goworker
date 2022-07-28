@@ -68,7 +68,7 @@ func (w *worker) startHeartbeat(c *redis.Client) {
 			case <-w.heartbeatTicker.C:
 				err := c.HSet(c.Context(), fmt.Sprintf("%s%s", workerSettings.Namespace, heartbeatKey), w.process.String(), time.Now().Format(time.RFC3339)).Err()
 				if err != nil {
-					logger.Errorf("Error on worker heartbeat %v: %v", w, err)
+					_ = logger.Errorf("Error on worker heartbeat %v: %v", w, err)
 				}
 			}
 		}
@@ -79,7 +79,7 @@ func (w *worker) pruneDeadWorkers(c *redis.Client) {
 	// Block with set+nx+ex
 	ok, err := c.SetNX(c.Context(), fmt.Sprintf("%s%s", workerSettings.Namespace, keyForWorkersPruning), w.String(), heartbeatInterval.Truncate(time.Second)).Result()
 	if err != nil {
-		logger.Criticalf("Error on setting lock to prune workers: %v", err)
+		_ = logger.Criticalf("Error on setting lock to prune workers: %v", err)
 		return
 	}
 
@@ -89,14 +89,14 @@ func (w *worker) pruneDeadWorkers(c *redis.Client) {
 	// Get all workers
 	workers, err := c.SMembers(c.Context(), fmt.Sprintf("%sworkers", workerSettings.Namespace)).Result()
 	if err != nil {
-		logger.Criticalf("Error on getting list of all workers: %v", err)
+		_ = logger.Criticalf("Error on getting list of all workers: %v", err)
 		return
 	}
 
 	// Get all workers that have sent a heartbeat and now is expired
 	heartbeatWorkers, err := c.HGetAll(c.Context(), fmt.Sprintf("%s%s", workerSettings.Namespace, heartbeatKey)).Result()
 	if err != nil {
-		logger.Criticalf("Error on getting list of all workers with heartbeat: %v", err)
+		_ = logger.Criticalf("Error on getting list of all workers with heartbeat: %v", err)
 		return
 	}
 
@@ -108,7 +108,7 @@ func (w *worker) pruneDeadWorkers(c *redis.Client) {
 
 		t, err := time.Parse(time.RFC3339, v)
 		if err != nil {
-			logger.Criticalf("Error on parsing the time of %q: %v", v, err)
+			_ = logger.Criticalf("Error on parsing the time of %q: %v", v, err)
 			return
 		}
 
@@ -134,26 +134,34 @@ func (w *worker) pruneDeadWorkers(c *redis.Client) {
 
 			works, err := c.Get(c.Context(), fmt.Sprintf("%sworker:%s", workerSettings.Namespace, wp.String())).Result()
 			if err != nil {
-				logger.Criticalf("Error on getting worker work for pruning: %v", err)
+				_ = logger.Criticalf("Error on getting worker work for pruning: %v", err)
 				return
 			}
 			if works != "" {
 				var work = work{}
 				err = json.Unmarshal([]byte(works), &work)
 				if err != nil {
-					logger.Criticalf("Error unmarshaling worker job: %v", err)
+					_ = logger.Criticalf("Error unmarshaling worker job: %v", err)
 					return
 				}
 
 				// If it has a job flag it as failed
 				wk := worker{process: wp}
-				wk.fail(c, &Job{
+				err = wk.fail(c, &Job{
 					Queue:   work.Queue,
 					Payload: work.Payload,
-				}, fmt.Errorf("Worker %s did not gracefully exit while processing %s", wk.process.String(), work.Payload.Class))
+				}, fmt.Errorf("worker %s did not gracefully exit while processing %s", wk.process.String(), work.Payload.Class))
+				if err != nil {
+					_ = logger.Criticalf("Error failing worker job: %v", err)
+					return
+				}
 			}
 
-			wp.close(c)
+			err = wp.close(c)
+			if err != nil {
+				_ = logger.Criticalf("Error closing connection to Redis: %v", err)
+				return
+			}
 		}
 	}
 }
@@ -213,7 +221,7 @@ func (w *worker) finish(c *redis.Client, job *Job, err error) error {
 func (w *worker) work(jobs <-chan *Job, monitor *sync.WaitGroup) {
 	err := w.open(client)
 	if err != nil {
-		logger.Criticalf("Error on opening worker %v: %v", w, err)
+		_ = logger.Criticalf("Error on opening worker %v: %v", w, err)
 		return
 	}
 
@@ -230,7 +238,7 @@ func (w *worker) work(jobs <-chan *Job, monitor *sync.WaitGroup) {
 
 			err := w.close(client)
 			if err != nil {
-				logger.Criticalf("Error on closing worker %v: %v", w, err)
+				_ = logger.Criticalf("Error on closing worker %v: %v", w, err)
 				return
 			}
 		}()
@@ -241,11 +249,11 @@ func (w *worker) work(jobs <-chan *Job, monitor *sync.WaitGroup) {
 				logger.Debugf("done: (Job{%s} | %s | %v)", job.Queue, job.Payload.Class, job.Payload.Args)
 			} else {
 				errorLog := fmt.Sprintf("No worker for %s in queue %s with args %v", job.Payload.Class, job.Queue, job.Payload.Args)
-				logger.Critical(errorLog)
+				_ = logger.Critical(errorLog)
 
 				err := w.finish(client, job, errors.New(errorLog))
 				if err != nil {
-					logger.Criticalf("Error on finishing worker %v: %v", w, err)
+					_ = logger.Criticalf("Error on finishing worker %v: %v", w, err)
 					return
 				}
 			}
@@ -259,7 +267,7 @@ func (w *worker) run(job *Job, workerFunc workerFunc) {
 	defer func() {
 		errFinish := w.finish(client, job, err)
 		if errFinish != nil {
-			logger.Criticalf("Error on finishing worker %v: %v", w, errFinish)
+			_ = logger.Criticalf("Error on finishing worker %v: %v", w, errFinish)
 			return
 		}
 	}()
@@ -272,7 +280,7 @@ func (w *worker) run(job *Job, workerFunc workerFunc) {
 
 	errStart := w.start(client, job)
 	if errStart != nil {
-		logger.Criticalf("Error on starting worker %v: %v", w, errStart)
+		_ = logger.Criticalf("Error on starting worker %v: %v", w, errStart)
 		return
 	}
 

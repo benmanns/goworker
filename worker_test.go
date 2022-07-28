@@ -52,12 +52,25 @@ func TestEnqueue(t *testing.T) {
 		},
 	}
 
-	flag.Set("exit-on-complete", "true")
-	flag.Set("queues", queueName)
-	flag.Set("concurrency", "1")
-	flag.Set("use-number", "true")
+	var err error
+	err = flag.Set("exit-on-complete", "true")
+	if err != nil {
+		t.Errorf("Error setting flag exit-on-complete: %v", err)
+	}
+	err = flag.Set("queues", queueName)
+	if err != nil {
+		t.Errorf("Error setting flag queues: %v", err)
+	}
+	err = flag.Set("concurrency", "1")
+	if err != nil {
+		t.Errorf("Error setting flag concurrency: %v", err)
+	}
+	err = flag.Set("use-number", "true")
+	if err != nil {
+		t.Errorf("Error setting flag use-number: %v", err)
+	}
 
-	err := Enqueue(expectedJob)
+	err = Enqueue(expectedJob)
 	if err != nil {
 		t.Errorf("Error while enqueue %s", err)
 	}

@@ -29,19 +29,19 @@ func Enqueue(job *Job) error {
 
 	buffer, err := json.Marshal(job.Payload)
 	if err != nil {
-		logger.Criticalf("Cant marshal payload on enqueue")
+		_ = logger.Criticalf("Cant marshal payload on enqueue")
 		return err
 	}
 
 	err = client.RPush(client.Context(), fmt.Sprintf("%squeue:%s", workerSettings.Namespace, job.Queue), buffer).Err()
 	if err != nil {
-		logger.Criticalf("Cant push to queue")
+		_ = logger.Criticalf("Cant push to queue")
 		return err
 	}
 
 	err = client.SAdd(client.Context(), fmt.Sprintf("%squeues", workerSettings.Namespace), job.Queue).Err()
 	if err != nil {
-		logger.Criticalf("Cant register queue to list of use queues")
+		_ = logger.Criticalf("Cant register queue to list of use queues")
 		return err
 	}
 
