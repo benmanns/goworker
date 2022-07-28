@@ -16,10 +16,9 @@ This is a fork of a [bennmans' library goworker](https://github.com/benmanns/gow
 - [kerak19](https://github.com/benmanns/goworker/pull/85) on replacing redis.go with go-redis (but using v9 instead of v7)
 - updated example in README to use correct parameter IntervalFloat instead of Interval which gets overwritten later
 - [FrankChung](https://github.com/benmanns/goworker/pull/46) to prevent overwriting WorkerSettings
-- [cthulhu](https://github.com/benmanns/goworker/pull/56)
+- [cthulhu](https://github.com/benmanns/goworker/pull/56) to... I didn't quite figure out what was happening without this PR, to be honest
 - [xescugc](https://github.com/benmanns/goworker/pull/87) to add heartbeats
 - [clalimarmo](https://github.com/benmanns/goworker/pull/7) to enable cleanup of closure resources
-- ...
 
 ## Installation
 
@@ -89,6 +88,14 @@ import (
 
 func newMyFunc(uri string) (func(queue string, args ...interface{}) error) {
 	foo := NewFoo(uri)
+
+	quit := goworker.Signals()
+	go func() {
+		<-quit
+		// release any resources held by foo
+		foo.CleanUp()
+	}()
+	
 	return func(queue string, args ...interface{}) error {
 		foo.Bar(args)
 		return nil
