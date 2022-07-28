@@ -75,7 +75,7 @@ func TestEnqueue(t *testing.T) {
 		t.Errorf("Error while enqueue %s", err)
 	}
 
-	actualArgs := []interface{}{}
+	var actualArgs []interface{}
 	actualQueueName := ""
 	Register(jobName, func(queue string, args ...interface{}) error {
 		actualArgs = args

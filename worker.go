@@ -127,7 +127,7 @@ func (w *worker) pruneDeadWorkers(c *redis.Client) {
 			pid, _ := strconv.Atoi(pidAndID[0])
 			wp := process{
 				Hostname: parts[0],
-				Pid:      int(pid),
+				Pid:      pid,
 				ID:       pidAndID[1],
 				Queues:   strings.Split(parts[2], ","),
 			}
