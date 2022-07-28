@@ -140,7 +140,7 @@ func Work() error {
 	}
 	defer Close()
 
-	quit := signals()
+	quit := Signals()
 
 	poller, err := newPoller(workerSettings.Queues, workerSettings.IsStrict)
 	if err != nil {

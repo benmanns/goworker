@@ -53,6 +53,13 @@
 //
 //	func newMyFunc(uri string) (func(queue string, args ...interface{}) error) {
 //		foo := NewFoo(uri)
+//
+//		quit := goworker.Signals()
+//		go func() {
+//			<-quit
+//			foo.CleanUp()
+//		}()
+//
 //		return func(queue string, args ...interface{}) error {
 //			foo.Bar(args)
 //			return nil

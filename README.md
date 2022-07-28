@@ -18,6 +18,7 @@ This is a fork of a [bennmans' library goworker](https://github.com/benmanns/gow
 - [FrankChung](https://github.com/benmanns/goworker/pull/46) to prevent overwriting WorkerSettings
 - [cthulhu](https://github.com/benmanns/goworker/pull/56)
 - [xescugc](https://github.com/benmanns/goworker/pull/87) to add heartbeats
+- [clalimarmo](https://github.com/benmanns/goworker/pull/7) to enable cleanup of closure resources
 - ...
 
 ## Installation
