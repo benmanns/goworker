@@ -60,3 +60,7 @@ func Signals() <-chan bool {
 
 	return quit
 }
+
+func signalStop(c chan<- os.Signal) {
+	signal.Stop(c)
+}
