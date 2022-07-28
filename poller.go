@@ -77,14 +77,14 @@ func (p *poller) poll(interval time.Duration, quit <-chan bool) (<-chan *Job, er
 			err = p.finish(client)
 			if err != nil {
 				err = errors.WithStack(err)
-				logger.Criticalf("Error on %v finishing working on %v: %+v", p, p.Queues, err)
+				_ = logger.Criticalf("Error on %v finishing working on %v: %+v", p, p.Queues, err)
 				return
 			}
 
 			err = p.close(client)
 			if err != nil {
 				err = errors.WithStack(err)
-				logger.Criticalf("Error on %v closing client on %v: %+v", p, p.Queues, err)
+				_ = logger.Criticalf("Error on %v closing client on %v: %+v", p, p.Queues, err)
 				return
 			}
 		}()
@@ -97,14 +97,14 @@ func (p *poller) poll(interval time.Duration, quit <-chan bool) (<-chan *Job, er
 				job, err := p.getJob(client)
 				if err != nil {
 					err = errors.WithStack(err)
-					logger.Criticalf("Error on %v getting job from %v: %+v", p, p.Queues, err)
+					_ = logger.Criticalf("Error on %v getting job from %v: %+v", p, p.Queues, err)
 					return
 				}
 				if job != nil {
 					err = client.Incr(client.Context(), fmt.Sprintf("%sstat:processed:%v", workerSettings.Namespace, p)).Err()
 					if err != nil {
 						err = errors.WithStack(err)
-						logger.Errorf("Error on %v incrementing stat on %v: %+v", p, p.Queues, err)
+						_ = logger.Errorf("Error on %v incrementing stat on %v: %+v", p, p.Queues, err)
 						return
 					}
 
@@ -114,14 +114,14 @@ func (p *poller) poll(interval time.Duration, quit <-chan bool) (<-chan *Job, er
 						buf, err := json.Marshal(job.Payload)
 						if err != nil {
 							err = errors.WithStack(err)
-							logger.Criticalf("Error requeueing %v: %v", job, err)
+							_ = logger.Criticalf("Error requeueing %v: %v", job, err)
 							return
 						}
 
 						err = client.LPush(client.Context(), fmt.Sprintf("%squeue:%s", workerSettings.Namespace, job.Queue), buf).Err()
 						if err != nil {
 							err = errors.WithStack(err)
-							logger.Criticalf("Error requeueing %v: %v", job, err)
+							_ = logger.Criticalf("Error requeueing %v: %v", job, err)
 							return
 						}
 
