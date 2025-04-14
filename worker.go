@@ -104,7 +104,7 @@ func (w *worker) work(jobs <-chan *Job, monitor *sync.WaitGroup) {
 			}
 		}()
 		for job := range jobs {
-			if workerFunc, ok := workers[job.Payload.Class]; ok {
+			if workerFunc, ok := workers.Get(job.Payload.Class); ok {
 				w.run(job, workerFunc)
 
 				logger.Debugf("done: (Job{%s} | %s | %v)", job.Queue, job.Payload.Class, job.Payload.Args)
