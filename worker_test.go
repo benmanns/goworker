@@ -1,6 +1,7 @@
 package goworker
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 )
@@ -76,4 +77,24 @@ func TestEnqueue(t *testing.T) {
 	if !reflect.DeepEqual(actualQueueName, queueName) {
 		t.Errorf("(Enqueue) Expected %v, actual %v", actualQueueName, queueName)
 	}
+}
+
+// use "go test -race -run TestRegister" to check for race conditions
+func TestRegister(t *testing.T) {
+	t.Run("test normal registration", func(t *testing.T) {
+		name := "oneWorker"
+
+		Register(name, func(s string, i ...interface{}) error {
+			return nil
+		})
+	})
+	t.Run("test concurrent registration", func(t *testing.T) {
+		name := "concurrentlyRegisteredWorker%d"
+
+		for i := 1; i <= 10; i++ {
+			go Register(fmt.Sprintf(name, i), func(s string, i ...interface{}) error {
+				return nil
+			})
+		}
+	})
 }
