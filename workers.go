@@ -3,14 +3,36 @@ package goworker
 import (
 	"encoding/json"
 	"fmt"
+	"sync"
 )
 
-var (
+type workersMutex struct {
+	sync.RWMutex
 	workers map[string]workerFunc
-)
+}
+
+func (wm *workersMutex) Add(class string, worker workerFunc) {
+	wm.Lock()
+	defer wm.Unlock()
+
+	wm.workers[class] = worker
+}
+
+func (wm *workersMutex) Get(class string) (worker workerFunc, ok bool) {
+	wm.RLock()
+	defer wm.RUnlock()
+
+	worker, ok = wm.workers[class]
+	return
+}
+
+var workers *workersMutex
 
 func init() {
-	workers = make(map[string]workerFunc)
+	workers = &workersMutex{
+		RWMutex: sync.RWMutex{},
+		workers: make(map[string]workerFunc),
+	}
 }
 
 // Register registers a goworker worker function. Class
@@ -18,7 +40,7 @@ func init() {
 // job. Worker is a function which accepts a queue and an
 // arbitrary array of interfaces as arguments.
 func Register(class string, worker workerFunc) {
-	workers[class] = worker
+	workers.Add(class, worker)
 }
 
 func Enqueue(job *Job) error {
