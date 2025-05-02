@@ -2,8 +2,8 @@ package goworker
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
+	"github.com/go-errors/errors"
 	"sync"
 	"time"
 )
@@ -49,7 +49,7 @@ func (w *worker) fail(conn *RedisConn, job *Job, err error) error {
 		FailedAt:  time.Now(),
 		Payload:   job.Payload,
 		Exception: "Error",
-		Error:     err.Error(),
+		Error:     err.(*errors.Error).ErrorStack(),
 		Worker:    w,
 		Queue:     job.Queue,
 	}
@@ -71,7 +71,7 @@ func (w *worker) succeed(conn *RedisConn, job *Job) error {
 
 func (w *worker) finish(conn *RedisConn, job *Job, err error) error {
 	if err != nil {
-		w.fail(conn, job, err)
+		w.fail(conn, job, errors.Wrap(err, 1))
 	} else {
 		w.succeed(conn, job)
 	}
