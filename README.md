@@ -114,7 +114,7 @@ func init() {
 		ExitOnComplete: false,
 		Concurrency:    2,
 		Namespace:      "resque:",
-		Interval:       5.0,
+		IntervalFloat:  5.0,
 	}
 	goworker.SetSettings(settings)
 	goworker.Register("MyClass", myFunc)
