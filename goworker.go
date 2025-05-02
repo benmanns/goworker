@@ -39,6 +39,8 @@ type WorkerSettings struct {
 }
 
 func SetSettings(settings WorkerSettings) {
+	// force the flags to be parsed first before setting the configs.
+	Init()
 	workerSettings = settings
 }
 
