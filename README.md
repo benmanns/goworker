@@ -187,6 +187,32 @@ goworker.Enqueue(&goworker.Job{
 })
 ```
 
+### Priority queues
+
+There is an optional way to define priorities for the queues, meaning that jobs from a queue with priority *n* would be pulled before jobs from a queue with priority *m* (*n* < *m*).
+
+```go
+settings := goworker.WorkerSettings{
+		URI:            "redis://localhost:6379/",
+		Connections:    100,
+		Queues:         []string{"med-priority", "low-priority", "high-priority"},
+		QueuesPriority: map[string]int{
+			"high-priority": 10,
+			"med-priority": 100,
+            "low-priority": 200,
+		},
+		UseNumber:      true,
+		ExitOnComplete: false,
+		Concurrency:    2,
+		Namespace:      "resque:",
+		Interval:       5.0,
+	}
+
+goworker.SetSettings(settings)
+```
+
+Priority will be set as zero (higher) if it is not provided or in case that a negative value would be provided.
+
 ## Flags
 
 There are several flags which control the operation of the goworker client.

@@ -25,6 +25,7 @@ var workerSettings WorkerSettings
 type WorkerSettings struct {
 	QueuesString   string
 	Queues         queuesFlag
+	QueuesPriority map[string]int
 	IntervalFloat  float64
 	Interval       intervalFlag
 	Concurrency    int
@@ -125,7 +126,7 @@ func Work() error {
 
 	quit := signals()
 
-	poller, err := newPoller(workerSettings.Queues, workerSettings.IsStrict)
+	poller, err := newPoller(workerSettings.Queues, workerSettings.QueuesPriority, workerSettings.IsStrict)
 	if err != nil {
 		return err
 	}
@@ -137,7 +138,7 @@ func Work() error {
 	var monitor sync.WaitGroup
 
 	for id := 0; id < workerSettings.Concurrency; id++ {
-		worker, err := newWorker(strconv.Itoa(id), workerSettings.Queues)
+		worker, err := newWorker(strconv.Itoa(id), workerSettings.Queues, workerSettings.QueuesPriority)
 		if err != nil {
 			return err
 		}

@@ -12,8 +12,8 @@ type worker struct {
 	process
 }
 
-func newWorker(id string, queues []string) (*worker, error) {
-	process, err := newProcess(id, queues)
+func newWorker(id string, queues []string, queuesPriority map[string]int) (*worker, error) {
+	process, err := newProcess(id, queues, queuesPriority)
 	if err != nil {
 		return nil, err
 	}
