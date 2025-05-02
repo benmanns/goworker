@@ -32,7 +32,7 @@ func newRedisFactory(uri string) pools.Factory {
 }
 
 func newRedisPool(uri string, capacity int, maxCapacity int, idleTimout time.Duration) *pools.ResourcePool {
-	return pools.NewResourcePool(newRedisFactory(uri), capacity, maxCapacity, idleTimout)
+	return pools.NewResourcePool(newRedisFactory(uri), capacity, maxCapacity, idleTimout, 0)
 }
 
 func redisConnFromURI(uriString string) (*RedisConn, error) {
