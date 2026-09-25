@@ -20,7 +20,7 @@
 // Because of this, there is no default queue,
 // nor is there a way to select all queues (à la
 // Resque's * queue). Queues are processed in
-// the order they are specififed.
+// the order they are specified.
 // If you have multiple queues you can assign
 // them weights. A queue with a weight of 2 will
 // be checked twice as often as a queue with a
@@ -75,13 +75,21 @@
 // occur when goworker and the json package decode
 // large numbers as floats, which then get
 // encoded in scientific notation, losing
-// pecision. This will default to true soon.
+// precision. This will default to true soon.
+//
+// -tls-cert=""
+// — Path to a PEM-encoded CA certificate to trust
+// when connecting with a rediss:// URI.
+//
+// -insecure-tls=false
+// — Skips TLS certificate verification for
+// rediss:// URIs.
 //
 // You can also configure your own flags for use
 // within your workers. Be sure to set them
-// before calling goworker.Main(). It is okay to
-// call flags.Parse() before calling
-// goworker.Main() if you need to do additional
+// before calling goworker.Work(). It is okay to
+// call flag.Parse() before calling
+// goworker.Work() if you need to do additional
 // processing on your flags.
 package goworker
 

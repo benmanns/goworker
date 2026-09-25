@@ -75,7 +75,7 @@
 // to convert them into usable types.
 //
 //	// Expecting (int, string, float64)
-//	func myFunc(queue, args ...interface{}) error {
+//	func myFunc(queue string, args ...interface{}) error {
 //		idNum, ok := args[0].(json.Number)
 //		if !ok {
 //			return errorInvalidParam
