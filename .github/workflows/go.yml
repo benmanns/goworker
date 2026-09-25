@@ -2,106 +2,66 @@ name: Go
 
 on:
   push:
-    branches: [ master ]
+    branches: [master]
   pull_request: {}
 
+permissions:
+  contents: read
+
 jobs:
-  build:
-    name: Build
+  test:
+    name: Test (Go ${{ matrix.go }}, Redis ${{ matrix.redis }})
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
-        go:
-          - "1.12"
-          - "1.13"
-          - "1.14"
-          - "1.15"
-        redis-version:
-          - 4
-          - 5
-          - 6
+        # The minimum version from go.mod plus the two releases the Go
+        # team currently supports.
+        go: ["1.22", oldstable, stable]
+        redis: ["6", "7"]
+
+    services:
+      redis:
+        image: redis:${{ matrix.redis }}
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 10
 
     steps:
-      - name: Check out code into the Go module directory
-        uses: actions/checkout@v2
+      - uses: actions/checkout@v5
 
-      - name: Setup Go
-        uses: actions/setup-go@v2
+      - uses: actions/setup-go@v6
         with:
           go-version: ${{ matrix.go }}
 
-      - name: Setup Redis
-        uses: supercharge/redis-github-action@1.1.0
-        with:
-          redis-version: ${{ matrix.redis-version }}
-
       - name: Build
-        run: go build -v .
+        run: go build -v ./...
+
+      - name: Vet
+        run: go vet ./...
 
       - name: Test
-        run: go test -v .
+        run: go test -race -v ./...
 
-  imports:
-    name: Imports
+  lint:
+    name: Lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@master
-      - name: check
-        uses: grandcolline/golang-github-actions@v1.1.0
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-go@v6
         with:
-          run: imports
-          token: ${{ secrets.GITHUB_TOKEN }}
+          go-version: stable
 
-  ## Checks to be enabled in the future:
+      - uses: golangci/golangci-lint-action@v8
+        with:
+          version: v2.5
 
-  # errcheck:
-  #   name: Errcheck
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - uses: actions/checkout@master
-  #     - name: check
-  #       uses: grandcolline/golang-github-actions@v1.1.0
-  #       with:
-  #         run: errcheck
-  #         token: ${{ secrets.GITHUB_TOKEN }}
-  # lint:
-  #   name: Lint
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - uses: actions/checkout@master
-  #     - name: check
-  #       uses: grandcolline/golang-github-actions@v1.1.0
-  #       with:
-  #         run: lint
-  #         token: ${{ secrets.GITHUB_TOKEN }}
-  # shadow:
-  #   name: Shadow
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - uses: actions/checkout@master
-  #     - name: check
-  #       uses: grandcolline/golang-github-actions@v1.1.0
-  #       with:
-  #         run: shadow
-  #         token: ${{ secrets.GITHUB_TOKEN }}
-  # staticcheck:
-  #   name: StaticCheck
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - uses: actions/checkout@master
-  #     - name: check
-  #       uses: grandcolline/golang-github-actions@v1.1.0
-  #       with:
-  #         run: staticcheck
-  #         token: ${{ secrets.GITHUB_TOKEN }}
-  # sec:
-  #   name: Sec
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - uses: actions/checkout@master
-  #     - name: check
-  #       uses: grandcolline/golang-github-actions@v1.1.0
-  #       with:
-  #         run: sec
-  #         token: ${{ secrets.GITHUB_TOKEN }}
-  #         # flags: "-exclude=G104"
+      - name: Check go.mod is tidy
+        run: |
+          go mod tidy
+          git diff --exit-code go.mod go.sum
