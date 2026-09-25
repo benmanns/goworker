@@ -1,24 +1,26 @@
 package goworker
 
 import (
+	"context"
+	"errors"
+	"log/slog"
 	"os"
 	"strconv"
 	"sync"
 	"time"
 
-	"golang.org/x/net/context"
-
-	"github.com/cihub/seelog"
-	"vitess.io/vitess/go/pools"
+	"github.com/gomodule/redigo/redis"
 )
 
 var (
-	logger      seelog.LoggerInterface
-	pool        *pools.ResourcePool
+	logger      = slog.New(slog.NewTextHandler(os.Stdout, nil))
+	pool        *redis.Pool
 	ctx         context.Context
 	initMutex   sync.Mutex
 	initialized bool
 )
+
+var errorNotInitialized = errors.New("goworker is not initialized; call Init or Work first")
 
 var workerSettings WorkerSettings
 
@@ -42,6 +44,13 @@ func SetSettings(settings WorkerSettings) {
 	workerSettings = settings
 }
 
+// SetLogger replaces the logger goworker writes to. By
+// default goworker logs at the info level to stdout. Call
+// SetLogger before Init or Work.
+func SetLogger(l *slog.Logger) {
+	logger = l
+}
+
 // Init initializes the goworker process. This will be
 // called by the Work function, but may be used by programs
 // that wish to access goworker functions and configuration
@@ -50,12 +59,6 @@ func Init() error {
 	initMutex.Lock()
 	defer initMutex.Unlock()
 	if !initialized {
-		var err error
-		logger, err = seelog.LoggerFromWriterWithMinLevel(os.Stdout, seelog.InfoLvl)
-		if err != nil {
-			return err
-		}
-
 		if err := flags(); err != nil {
 			return err
 		}
@@ -75,12 +78,14 @@ func Init() error {
 // while they wait for an available connection. Expect this
 // API to change drastically.
 func GetConn() (*RedisConn, error) {
-	resource, err := pool.Get(ctx)
-
+	if pool == nil {
+		return nil, errorNotInitialized
+	}
+	conn, err := pool.GetContext(ctx)
 	if err != nil {
 		return nil, err
 	}
-	return resource.(*RedisConn), nil
+	return &RedisConn{Conn: conn}, nil
 }
 
 // PutConn puts a connection back into the connection pool.
@@ -88,7 +93,7 @@ func GetConn() (*RedisConn, error) {
 // you got from GetConn. Expect this API to change
 // drastically.
 func PutConn(conn *RedisConn) {
-	pool.Put(conn)
+	conn.Close()
 }
 
 // Close cleans up resources initialized by goworker. This

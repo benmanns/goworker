@@ -51,26 +51,26 @@ func Enqueue(job *Job) error {
 
 	conn, err := GetConn()
 	if err != nil {
-		logger.Criticalf("Error on getting connection on enqueue")
+		logger.Error("getting connection on enqueue", "error", err)
 		return err
 	}
 	defer PutConn(conn)
 
 	buffer, err := json.Marshal(job.Payload)
 	if err != nil {
-		logger.Criticalf("Cant marshal payload on enqueue")
+		logger.Error("marshaling payload on enqueue", "error", err)
 		return err
 	}
 
 	err = conn.Send("RPUSH", fmt.Sprintf("%squeue:%s", workerSettings.Namespace, job.Queue), buffer)
 	if err != nil {
-		logger.Criticalf("Cant push to queue")
+		logger.Error("pushing to queue", "error", err)
 		return err
 	}
 
 	err = conn.Send("SADD", fmt.Sprintf("%squeues", workerSettings.Namespace), job.Queue)
 	if err != nil {
-		logger.Criticalf("Cant register queue to list of use queues")
+		logger.Error("registering queue", "error", err)
 		return err
 	}
 

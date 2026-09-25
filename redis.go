@@ -1,16 +1,16 @@
 package goworker
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"net/url"
+	"os"
 	"time"
 
 	"github.com/gomodule/redigo/redis"
-	"vitess.io/vitess/go/pools"
 )
 
 var (
@@ -25,17 +25,30 @@ func (r *RedisConn) Close() {
 	_ = r.Conn.Close()
 }
 
-func newRedisFactory(uri string) pools.Factory {
-	return func() (pools.Resource, error) {
-		return redisConnFromURI(uri)
+func newRedisPool(uri string, capacity int, maxCapacity int, idleTimeout time.Duration) *redis.Pool {
+	return &redis.Pool{
+		DialContext: func(ctx context.Context) (redis.Conn, error) {
+			return redisConnFromURI(ctx, uri)
+		},
+		MaxIdle:     capacity,
+		MaxActive:   maxCapacity,
+		IdleTimeout: idleTimeout,
+		// Block callers until a connection is available
+		// rather than failing, as the previous pool did.
+		Wait: true,
+		// Connections that sat idle may have been dropped by
+		// the server or a proxy; check them before reuse.
+		TestOnBorrow: func(c redis.Conn, t time.Time) error {
+			if time.Since(t) < 10*time.Second {
+				return nil
+			}
+			_, err := c.Do("PING")
+			return err
+		},
 	}
 }
 
-func newRedisPool(uri string, capacity int, maxCapacity int, idleTimout time.Duration) *pools.ResourcePool {
-	return pools.NewResourcePool(newRedisFactory(uri), capacity, maxCapacity, idleTimout)
-}
-
-func redisConnFromURI(uriString string) (*RedisConn, error) {
+func redisConnFromURI(ctx context.Context, uriString string) (redis.Conn, error) {
 	uri, err := url.Parse(uriString)
 	if err != nil {
 		return nil, err
@@ -78,7 +91,7 @@ func redisConnFromURI(uriString string) (*RedisConn, error) {
 		return nil, errorInvalidScheme
 	}
 
-	conn, err := redis.Dial(network, host, dialOptions...)
+	conn, err := redis.DialContext(ctx, network, host, dialOptions...)
 	if err != nil {
 		return nil, err
 	}
@@ -99,7 +112,7 @@ func redisConnFromURI(uriString string) (*RedisConn, error) {
 		}
 	}
 
-	return &RedisConn{Conn: conn}, nil
+	return conn, nil
 }
 
 func getCertPool(certPath string) (*x509.CertPool, error) {
@@ -107,7 +120,7 @@ func getCertPool(certPath string) (*x509.CertPool, error) {
 	if rootCAs == nil {
 		rootCAs = x509.NewCertPool()
 	}
-	certs, err := ioutil.ReadFile(workerSettings.TLSCertPath)
+	certs, err := os.ReadFile(workerSettings.TLSCertPath)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to read %q for the RootCA pool: %v", workerSettings.TLSCertPath, err)
 	}

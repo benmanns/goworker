@@ -5,7 +5,7 @@
 // automatically poll a Redis server and call
 // your workers as jobs arrive.
 //
-// Flags
+// # Flags
 //
 // There are several flags which control the
 // operation of the goworker client.
@@ -143,10 +143,7 @@ func flags() error {
 	workerSettings.IsStrict = strings.IndexRune(workerSettings.QueuesString, '=') == -1
 
 	if !workerSettings.UseNumber {
-		logger.Warn("== DEPRECATION WARNING ==")
-		logger.Warn("  Currently, encoding/json decodes numbers as float64.")
-		logger.Warn("  This can cause numbers to lose precision as they are read from the Resque queue.")
-		logger.Warn("  Set the -use-number flag to use json.Number when decoding numbers and remove this warning.")
+		logger.Warn("deprecation: numbers in job payloads are decoded as float64 and may lose precision; set -use-number to decode them as json.Number and remove this warning")
 	}
 
 	return nil

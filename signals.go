@@ -6,7 +6,7 @@
 // $CONCURRENCY jobs currently running, which
 // will continue to run until they are finished.
 //
-// Failure Modes
+// # Failure Modes
 //
 // Like Resque, goworker makes no guarantees
 // about the safety of jobs in the event of
@@ -52,7 +52,7 @@ func signals() <-chan bool {
 		defer close(signals)
 
 		signal.Notify(signals, syscall.SIGQUIT, syscall.SIGTERM, os.Interrupt)
-		defer signalStop(signals)
+		defer signal.Stop(signals)
 
 		<-signals
 		quit <- true
