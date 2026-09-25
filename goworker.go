@@ -15,7 +15,6 @@ import (
 var (
 	logger      = slog.New(slog.NewTextHandler(os.Stdout, nil))
 	pool        *redis.Pool
-	ctx         context.Context
 	initMutex   sync.Mutex
 	initialized bool
 )
@@ -68,7 +67,6 @@ func Init() error {
 		if err := flags(); err != nil {
 			return err
 		}
-		ctx = context.Background()
 
 		pool = newRedisPool(workerSettings.URI, workerSettings.Connections, workerSettings.Connections, time.Minute)
 
@@ -87,7 +85,7 @@ func GetConn() (*RedisConn, error) {
 	if pool == nil {
 		return nil, errNotInitialized
 	}
-	conn, err := pool.GetContext(ctx)
+	conn, err := pool.GetContext(context.Background())
 	if err != nil {
 		return nil, err
 	}

@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"os"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -279,13 +280,25 @@ func TestStartedTimestampIsResqueFormat(t *testing.T) {
 	}
 }
 
-func TestSignalsStop(t *testing.T) {
+func TestSignals(t *testing.T) {
 	quit, stop := signals()
-	stop()
-	stop() // idempotent
+	defer stop()
 	select {
 	case <-quit:
 		t.Fatal("quit closed without a signal")
 	default:
+	}
+
+	p, err := os.FindProcess(os.Getpid())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := p.Signal(syscall.SIGTERM); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-quit:
+	case <-time.After(5 * time.Second):
+		t.Fatal("quit not closed after SIGTERM")
 	}
 }

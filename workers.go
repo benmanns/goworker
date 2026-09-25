@@ -26,14 +26,7 @@ func (wm *workersMutex) Get(class string) (worker workerFunc, ok bool) {
 	return
 }
 
-var workers *workersMutex
-
-func init() {
-	workers = &workersMutex{
-		RWMutex: sync.RWMutex{},
-		workers: make(map[string]workerFunc),
-	}
-}
+var workers = &workersMutex{workers: make(map[string]workerFunc)}
 
 // Register registers a goworker worker function. Class
 // refers to the Ruby name of the class which enqueues the

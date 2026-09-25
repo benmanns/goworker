@@ -22,10 +22,6 @@ func newWorker(id string, queues []string) (*worker, error) {
 	}, nil
 }
 
-func (w *worker) MarshalJSON() ([]byte, error) {
-	return json.Marshal(w.String())
-}
-
 func (w *worker) start(conn *RedisConn, job *Job) error {
 	work := &work{
 		Queue:   job.Queue,
