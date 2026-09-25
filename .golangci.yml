@@ -36,6 +36,9 @@ linters:
       enable-all: true
       disable:
         - fieldalignment # reorders struct fields for size; not worth the churn
+    gosec:
+      excludes:
+        - G404 # math/rand only shuffles queue polling order; nothing here needs crypto/rand
     nolintlint:
       require-explanation: true
       require-specific: true
