@@ -111,7 +111,9 @@ func Close() {
 	initMutex.Lock()
 	defer initMutex.Unlock()
 	if initialized {
-		pool.Close()
+		if err := pool.Close(); err != nil {
+			logger.Error("closing Redis pool", "error", err)
+		}
 		initialized = false
 	}
 }
@@ -128,7 +130,12 @@ func Work() error {
 	}
 	defer Close()
 
-	quit := signals()
+	if len(workerSettings.Queues) == 0 {
+		return errorEmptyQueues
+	}
+
+	quit, stop := signals()
+	defer stop()
 
 	poller, err := newPoller(workerSettings.Queues, workerSettings.IsStrict)
 	if err != nil {

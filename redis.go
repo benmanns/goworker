@@ -6,8 +6,10 @@ import (
 	"crypto/x509"
 	"errors"
 	"fmt"
+	"net"
 	"net/url"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/gomodule/redigo/redis"
@@ -55,64 +57,50 @@ func redisConnFromURI(ctx context.Context, uriString string) (redis.Conn, error)
 	}
 
 	var network string
-	var host string
-	var password string
-	var db string
+	var address string
 	var dialOptions []redis.DialOption
 
 	switch uri.Scheme {
 	case "redis", "rediss":
 		network = "tcp"
-		host = uri.Host
+		address = uri.Host
+		if uri.Port() == "" {
+			address = net.JoinHostPort(uri.Hostname(), "6379")
+		}
 		if uri.User != nil {
-			password, _ = uri.User.Password()
+			if password, ok := uri.User.Password(); ok && password != "" {
+				dialOptions = append(dialOptions, redis.DialPassword(password))
+			}
 		}
 		if len(uri.Path) > 1 {
-			db = uri.Path[1:]
+			db, err := strconv.Atoi(uri.Path[1:])
+			if err != nil {
+				return nil, fmt.Errorf("invalid Redis database %q: %w", uri.Path[1:], err)
+			}
+			dialOptions = append(dialOptions, redis.DialDatabase(db))
 		}
 		if uri.Scheme == "rediss" {
 			dialOptions = append(dialOptions, redis.DialUseTLS(true))
-			dialOptions = append(dialOptions, redis.DialTLSSkipVerify(workerSettings.SkipTLSVerify))
-			if len(workerSettings.TLSCertPath) > 0 {
+			config := &tls.Config{
+				InsecureSkipVerify: workerSettings.SkipTLSVerify,
+			}
+			if workerSettings.TLSCertPath != "" {
 				pool, err := getCertPool(workerSettings.TLSCertPath)
 				if err != nil {
 					return nil, err
 				}
-				config := &tls.Config{
-					RootCAs: pool,
-				}
-				dialOptions = append(dialOptions, redis.DialTLSConfig(config))
+				config.RootCAs = pool
 			}
+			dialOptions = append(dialOptions, redis.DialTLSConfig(config))
 		}
 	case "unix":
 		network = "unix"
-		host = uri.Path
+		address = uri.Path
 	default:
 		return nil, errorInvalidScheme
 	}
 
-	conn, err := redis.DialContext(ctx, network, host, dialOptions...)
-	if err != nil {
-		return nil, err
-	}
-
-	if password != "" {
-		_, err := conn.Do("AUTH", password)
-		if err != nil {
-			conn.Close()
-			return nil, err
-		}
-	}
-
-	if db != "" {
-		_, err := conn.Do("SELECT", db)
-		if err != nil {
-			conn.Close()
-			return nil, err
-		}
-	}
-
-	return conn, nil
+	return redis.DialContext(ctx, network, address, dialOptions...)
 }
 
 func getCertPool(certPath string) (*x509.CertPool, error) {
@@ -120,12 +108,12 @@ func getCertPool(certPath string) (*x509.CertPool, error) {
 	if rootCAs == nil {
 		rootCAs = x509.NewCertPool()
 	}
-	certs, err := os.ReadFile(workerSettings.TLSCertPath)
+	certs, err := os.ReadFile(certPath)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to read %q for the RootCA pool: %v", workerSettings.TLSCertPath, err)
+		return nil, fmt.Errorf("reading %q for the root CA pool: %w", certPath, err)
 	}
 	if ok := rootCAs.AppendCertsFromPEM(certs); !ok {
-		return nil, fmt.Errorf("Failed to append %q to the RootCA pool: %v", workerSettings.TLSCertPath, err)
+		return nil, fmt.Errorf("no PEM certificates found in %q", certPath)
 	}
 	return rootCAs, nil
 }

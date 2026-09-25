@@ -13,8 +13,7 @@ func (i *intervalFlag) Set(value string) error {
 	if err != nil {
 		return err
 	}
-	i.SetFloat(f)
-	return nil
+	return i.SetFloat(f)
 }
 
 func (i *intervalFlag) SetFloat(value float64) error {

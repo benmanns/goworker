@@ -62,17 +62,13 @@ func Enqueue(job *Job) error {
 		return err
 	}
 
-	err = conn.Send("RPUSH", fmt.Sprintf("%squeue:%s", workerSettings.Namespace, job.Queue), buffer)
+	err = pipeline(conn,
+		command("SADD", fmt.Sprintf("%squeues", workerSettings.Namespace), job.Queue),
+		command("RPUSH", fmt.Sprintf("%squeue:%s", workerSettings.Namespace, job.Queue), buffer),
+	)
 	if err != nil {
-		logger.Error("pushing to queue", "error", err)
+		logger.Error("pushing to queue", "queue", job.Queue, "error", err)
 		return err
 	}
-
-	err = conn.Send("SADD", fmt.Sprintf("%squeues", workerSettings.Namespace), job.Queue)
-	if err != nil {
-		logger.Error("registering queue", "error", err)
-		return err
-	}
-
-	return conn.Flush()
+	return nil
 }

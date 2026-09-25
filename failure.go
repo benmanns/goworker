@@ -1,6 +1,10 @@
 package goworker
 
 import (
+	"encoding/json"
+	"errors"
+	"fmt"
+	"strings"
 	"time"
 )
 
@@ -10,6 +14,47 @@ type failure struct {
 	Exception string    `json:"exception"`
 	Error     string    `json:"error"`
 	Backtrace []string  `json:"backtrace"`
-	Worker    *worker   `json:"worker"`
+	Worker    string    `json:"worker"`
 	Queue     string    `json:"queue"`
+}
+
+// panicError is returned for a worker function that panicked.
+type panicError struct {
+	value interface{}
+	stack []byte
+}
+
+func (e *panicError) Error() string {
+	return fmt.Sprint(e.value)
+}
+
+// recordFailure pushes a Resque-compatible failure record for
+// job onto the failed list and updates the failure stats for
+// the process p.
+func recordFailure(conn *RedisConn, p string, job *Job, err error, backtrace []string) error {
+	var pe *panicError
+	if backtrace == nil && errors.As(err, &pe) {
+		backtrace = strings.Split(strings.TrimSpace(string(pe.stack)), "\n")
+	}
+	if backtrace == nil {
+		// Resque clients expect an array here, not null.
+		backtrace = []string{}
+	}
+	buffer, merr := json.Marshal(&failure{
+		FailedAt:  time.Now(),
+		Payload:   job.Payload,
+		Exception: "Error",
+		Error:     err.Error(),
+		Backtrace: backtrace,
+		Worker:    p,
+		Queue:     job.Queue,
+	})
+	if merr != nil {
+		return merr
+	}
+	return pipeline(conn,
+		command("RPUSH", fmt.Sprintf("%sfailed", workerSettings.Namespace), buffer),
+		command("INCR", fmt.Sprintf("%sstat:failed", workerSettings.Namespace)),
+		command("INCR", fmt.Sprintf("%sstat:failed:%s", workerSettings.Namespace, p)),
+	)
 }

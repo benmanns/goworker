@@ -5,6 +5,8 @@
 // stop job polling. There can be up to
 // $CONCURRENCY jobs currently running, which
 // will continue to run until they are finished.
+// A second signal is handled by the Go runtime's
+// default behavior, which terminates the process.
 //
 // # Failure Modes
 //
@@ -41,22 +43,30 @@ package goworker
 import (
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 )
 
-func signals() <-chan bool {
-	quit := make(chan bool)
+// signals returns a channel that is closed when the process
+// receives a QUIT, TERM, or INT signal, and a function that
+// stops listening for signals. Call stop once the returned
+// channel is no longer needed so that signals regain their
+// default behavior.
+func signals() (quit <-chan struct{}, stop func()) {
+	q := make(chan struct{})
+	done := make(chan struct{})
+	sigs := make(chan os.Signal, 1)
+	signal.Notify(sigs, syscall.SIGQUIT, syscall.SIGTERM, os.Interrupt)
 
 	go func() {
-		signals := make(chan os.Signal)
-		defer close(signals)
-
-		signal.Notify(signals, syscall.SIGQUIT, syscall.SIGTERM, os.Interrupt)
-		defer signal.Stop(signals)
-
-		<-signals
-		quit <- true
+		defer signal.Stop(sigs)
+		select {
+		case <-sigs:
+			close(q)
+		case <-done:
+		}
 	}()
 
-	return quit
+	var once sync.Once
+	return q, func() { once.Do(func() { close(done) }) }
 }

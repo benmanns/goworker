@@ -2,8 +2,8 @@ package goworker
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
+	"runtime/debug"
 	"sync"
 	"time"
 )
@@ -38,56 +38,47 @@ func (w *worker) start(conn *RedisConn, job *Job) error {
 		return err
 	}
 
-	conn.Send("SET", fmt.Sprintf("%sworker:%s", workerSettings.Namespace, w), buffer)
 	logger.Debug("processing job", "queue", work.Queue, "class", work.Payload.Class, "run_at", work.RunAt)
 
-	return w.process.start(conn)
+	return pipeline(conn,
+		command("SET", fmt.Sprintf("%sworker:%s", workerSettings.Namespace, w), buffer),
+		command("SET", fmt.Sprintf("%sworker:%s:started", workerSettings.Namespace, w), time.Now().Format(startedFormat)),
+	)
 }
 
-func (w *worker) fail(conn *RedisConn, job *Job, err error) error {
-	failure := &failure{
-		FailedAt:  time.Now(),
-		Payload:   job.Payload,
-		Exception: "Error",
-		Error:     err.Error(),
-		Worker:    w,
-		Queue:     job.Queue,
-	}
-	buffer, err := json.Marshal(failure)
-	if err != nil {
-		return err
-	}
-	conn.Send("RPUSH", fmt.Sprintf("%sfailed", workerSettings.Namespace), buffer)
-
-	return w.process.fail(conn)
-}
-
-func (w *worker) succeed(conn *RedisConn, job *Job) error {
-	conn.Send("INCR", fmt.Sprintf("%sstat:processed", workerSettings.Namespace))
-	conn.Send("INCR", fmt.Sprintf("%sstat:processed:%s", workerSettings.Namespace, w))
-
-	return nil
+func (w *worker) succeed(conn *RedisConn) error {
+	return pipeline(conn,
+		command("INCR", fmt.Sprintf("%sstat:processed", workerSettings.Namespace)),
+		command("INCR", fmt.Sprintf("%sstat:processed:%s", workerSettings.Namespace, w)),
+	)
 }
 
 func (w *worker) finish(conn *RedisConn, job *Job, err error) error {
+	var result error
 	if err != nil {
-		w.fail(conn, job, err)
+		result = recordFailure(conn, w.String(), job, err, nil)
 	} else {
-		w.succeed(conn, job)
+		result = w.succeed(conn)
 	}
-	return w.process.finish(conn)
+	if ferr := w.process.finish(conn); result == nil {
+		result = ferr
+	}
+	return result
 }
 
 func (w *worker) work(jobs <-chan *Job, monitor *sync.WaitGroup) {
 	conn, err := GetConn()
 	if err != nil {
 		logger.Error("getting connection in worker", "worker", w, "error", err)
-		return
 	} else {
-		w.open(conn)
+		if err := w.open(conn); err != nil {
+			logger.Error("registering worker", "worker", w, "error", err)
+		}
 		PutConn(conn)
 	}
 
+	// Keep consuming jobs even if registration failed so the
+	// poller never blocks on a worker that is not listening.
 	monitor.Add(1)
 
 	go func() {
@@ -98,10 +89,11 @@ func (w *worker) work(jobs <-chan *Job, monitor *sync.WaitGroup) {
 			if err != nil {
 				logger.Error("getting connection in worker", "worker", w, "error", err)
 				return
-			} else {
-				w.close(conn)
-				PutConn(conn)
 			}
+			if err := w.close(conn); err != nil {
+				logger.Error("unregistering worker", "worker", w, "error", err)
+			}
+			PutConn(conn)
 		}()
 		for job := range jobs {
 			if workerFunc, ok := workers.Get(job.Payload.Class); ok {
@@ -109,47 +101,50 @@ func (w *worker) work(jobs <-chan *Job, monitor *sync.WaitGroup) {
 
 				logger.Debug("done", "queue", job.Queue, "class", job.Payload.Class, "args", job.Payload.Args)
 			} else {
-				errorLog := fmt.Sprintf("No worker for %s in queue %s with args %v", job.Payload.Class, job.Queue, job.Payload.Args)
-				logger.Error(errorLog)
-
-				conn, err := GetConn()
-				if err != nil {
-					logger.Error("getting connection in worker", "worker", w, "error", err)
-					return
-				} else {
-					w.finish(conn, job, errors.New(errorLog))
-					PutConn(conn)
-				}
+				err := fmt.Errorf("no worker for %s in queue %s with args %v", job.Payload.Class, job.Queue, job.Payload.Args)
+				logger.Error(err.Error())
+				w.report(job, err)
 			}
 		}
 	}()
 }
 
 func (w *worker) run(job *Job, workerFunc workerFunc) {
-	var err error
-	defer func() {
-		conn, errCon := GetConn()
-		if errCon != nil {
-			logger.Error("getting connection in worker on finish", "worker", w, "error", errCon)
-			return
-		} else {
-			w.finish(conn, job, err)
-			PutConn(conn)
-		}
-	}()
-	defer func() {
-		if r := recover(); r != nil {
-			err = errors.New(fmt.Sprint(r))
-		}
-	}()
-
 	conn, err := GetConn()
 	if err != nil {
+		// Bookkeeping failed, but the job is already off the
+		// queue: run it anyway rather than dropping it.
 		logger.Error("getting connection in worker on start", "worker", w, "error", err)
-		return
 	} else {
-		w.start(conn, job)
+		if err := w.start(conn, job); err != nil {
+			logger.Error("recording job start", "worker", w, "error", err)
+		}
 		PutConn(conn)
 	}
-	err = workerFunc(job.Queue, job.Payload.Args...)
+
+	w.report(job, call(job, workerFunc))
+}
+
+// report records the outcome of job in Redis.
+func (w *worker) report(job *Job, err error) {
+	conn, errConn := GetConn()
+	if errConn != nil {
+		logger.Error("getting connection in worker on finish", "worker", w, "queue", job.Queue, "class", job.Payload.Class, "job_error", err, "error", errConn)
+		return
+	}
+	defer PutConn(conn)
+	if ferr := w.finish(conn, job, err); ferr != nil {
+		logger.Error("recording job result", "worker", w, "queue", job.Queue, "class", job.Payload.Class, "job_error", err, "error", ferr)
+	}
+}
+
+// call runs workerFunc for job, converting a panic into an
+// error that carries the stack trace.
+func call(job *Job, workerFunc workerFunc) (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = &panicError{value: r, stack: debug.Stack()}
+		}
+	}()
+	return workerFunc(job.Queue, job.Payload.Args...)
 }

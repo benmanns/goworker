@@ -52,9 +52,7 @@ func TestEnqueue(t *testing.T) {
 		},
 	}
 
-	workerSettings.Queues = []string{queueName}
-	workerSettings.UseNumber = true
-	workerSettings.ExitOnComplete = true
+	setupRedisTest(t, queueName)
 
 	err := Enqueue(expectedJob)
 	if err != nil {
