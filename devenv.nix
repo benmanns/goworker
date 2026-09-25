@@ -7,6 +7,7 @@
   packages = [
     pkgs.git
     pkgs.golangci-lint
+    pkgs.govulncheck
   ];
 
   # Integration tests talk to a real Redis on localhost:6379, which is also
@@ -25,6 +26,9 @@
     '';
     lint.exec = ''
       golangci-lint run ./...
+    '';
+    vulncheck.exec = ''
+      govulncheck ./...
     '';
     unit.exec = ''
       go test -race -count=1 ./...

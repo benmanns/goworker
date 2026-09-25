@@ -184,15 +184,15 @@ func TestEnqueueWithoutQueues(t *testing.T) {
 	if err := Enqueue(&Job{Queue: "q", Payload: Payload{Class: "X"}}); err != nil {
 		t.Fatalf("Enqueue without -queues: %v", err)
 	}
-	if err := Work(); err != errorEmptyQueues {
-		t.Errorf("Work without queues = %v, want %v", err, errorEmptyQueues)
+	if err := Work(); !errors.Is(err, errEmptyQueues) {
+		t.Errorf("Work without queues = %v, want %v", err, errEmptyQueues)
 	}
 }
 
 func TestInitDoesNotDuplicateQueues(t *testing.T) {
 	Close()
 	SetSettings(WorkerSettings{QueuesString: "high=2,low"})
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		if err := Init(); err != nil {
 			t.Fatal(err)
 		}
@@ -267,7 +267,7 @@ func TestStartedTimestampIsResqueFormat(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer PutConn(conn)
-	if err := p.start(conn); err != nil {
+	if err = p.start(conn); err != nil {
 		t.Fatal(err)
 	}
 	started, err := redis.String(conn.Do("GET", fmt.Sprintf("%sworker:%s:started", Namespace(), p)))

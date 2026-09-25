@@ -20,10 +20,14 @@ var (
 	initialized bool
 )
 
-var errorNotInitialized = errors.New("goworker is not initialized; call Init or Work first")
+var errNotInitialized = errors.New("goworker is not initialized; call Init or Work first")
 
 var workerSettings WorkerSettings
 
+// WorkerSettings configures goworker. Pass it to
+// SetSettings to configure goworker from code instead of
+// with command-line flags. The fields correspond to the
+// flags described in the package documentation.
 type WorkerSettings struct {
 	QueuesString   string
 	Queues         queuesFlag
@@ -40,6 +44,8 @@ type WorkerSettings struct {
 	TLSCertPath    string
 }
 
+// SetSettings replaces goworker's settings. Call it before
+// Init or Work.
 func SetSettings(settings WorkerSettings) {
 	workerSettings = settings
 }
@@ -79,7 +85,7 @@ func Init() error {
 // API to change drastically.
 func GetConn() (*RedisConn, error) {
 	if pool == nil {
-		return nil, errorNotInitialized
+		return nil, errNotInitialized
 	}
 	conn, err := pool.GetContext(ctx)
 	if err != nil {
@@ -131,7 +137,7 @@ func Work() error {
 	defer Close()
 
 	if len(workerSettings.Queues) == 0 {
-		return errorEmptyQueues
+		return errEmptyQueues
 	}
 
 	quit, stop := signals()
@@ -148,7 +154,7 @@ func Work() error {
 
 	var monitor sync.WaitGroup
 
-	for id := 0; id < workerSettings.Concurrency; id++ {
+	for id := range workerSettings.Concurrency {
 		worker, err := newWorker(strconv.Itoa(id), workerSettings.Queues)
 		if err != nil {
 			return err

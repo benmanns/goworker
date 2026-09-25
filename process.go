@@ -75,7 +75,7 @@ func (p *process) queues(strict bool) []string {
 		return p.Queues
 	}
 
-	// If not then we want to to shuffle the queues before returning them.
+	// If not then we want to shuffle the queues before returning them.
 	queues := make([]string, len(p.Queues))
 	for i, v := range rand.Perm(len(p.Queues)) {
 		queues[i] = p.Queues[v]

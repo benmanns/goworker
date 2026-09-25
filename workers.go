@@ -43,6 +43,9 @@ func Register(class string, worker workerFunc) {
 	workers.Add(class, worker)
 }
 
+// Enqueue pushes job onto its queue in the same format Resque
+// uses, so it can be processed by goworker or by Ruby Resque
+// workers. It initializes goworker if needed.
 func Enqueue(job *Job) error {
 	err := Init()
 	if err != nil {

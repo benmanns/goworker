@@ -65,3 +65,14 @@ jobs:
         run: |
           go mod tidy
           git diff --exit-code go.mod go.sum
+
+  vulncheck:
+    name: Vulnerability check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: golang/govulncheck-action@v1
+        with:
+          go-version-input: stable
+          go-package: ./...

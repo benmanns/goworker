@@ -3,6 +3,7 @@ package goworker
 import (
 	"fmt"
 	"reflect"
+	"sync"
 	"testing"
 )
 
@@ -32,10 +33,8 @@ func TestWorkerMarshalJSON(t *testing.T) {
 		actual, err := tt.w.MarshalJSON()
 		if err != nil {
 			t.Errorf("Worker(%#v): error %s", tt.w, err)
-		} else {
-			if string(actual) != string(tt.expected) {
-				t.Errorf("Worker(%#v): expected %s, actual %s", tt.w, tt.expected, actual)
-			}
+		} else if string(actual) != string(tt.expected) {
+			t.Errorf("Worker(%#v): expected %s, actual %s", tt.w, tt.expected, actual)
 		}
 	}
 }
@@ -77,22 +76,33 @@ func TestEnqueue(t *testing.T) {
 	}
 }
 
-// use "go test -race -run TestRegister" to check for race conditions
+// Use "go test -race -run TestRegister" to check for race conditions.
 func TestRegister(t *testing.T) {
-	t.Run("test normal registration", func(t *testing.T) {
+	t.Run("test normal registration", func(_ *testing.T) {
 		name := "oneWorker"
 
-		Register(name, func(s string, i ...interface{}) error {
+		Register(name, func(string, ...interface{}) error {
 			return nil
 		})
 	})
 	t.Run("test concurrent registration", func(t *testing.T) {
 		name := "concurrentlyRegisteredWorker%d"
 
+		var wg sync.WaitGroup
 		for i := 1; i <= 10; i++ {
-			go Register(fmt.Sprintf(name, i), func(s string, i ...interface{}) error {
-				return nil
-			})
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				Register(fmt.Sprintf(name, i), func(string, ...interface{}) error {
+					return nil
+				})
+			}()
+		}
+		wg.Wait()
+		for i := 1; i <= 10; i++ {
+			if _, ok := workers.Get(fmt.Sprintf(name, i)); !ok {
+				t.Errorf("worker %d was not registered", i)
+			}
 		}
 	})
 }

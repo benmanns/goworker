@@ -10,7 +10,7 @@ import (
 	"github.com/gomodule/redigo/redis"
 )
 
-var errorInvalidPayload = errors.New("invalid job payload")
+var errInvalidPayload = errors.New("invalid job payload")
 
 type poller struct {
 	process
@@ -35,7 +35,7 @@ func (p *poller) getJob(conn *RedisConn) (*Job, error) {
 		logger.Debug("checking queue", "queue", queue)
 
 		reply, err := redis.Bytes(conn.Do("LPOP", fmt.Sprintf("%squeue:%s", workerSettings.Namespace, queue)))
-		if err == redis.ErrNil {
+		if errors.Is(err, redis.ErrNil) {
 			continue
 		}
 		if err != nil {
@@ -54,11 +54,11 @@ func (p *poller) getJob(conn *RedisConn) (*Job, error) {
 			// The job is already off the queue, so record it
 			// as failed rather than silently dropping it.
 			logger.Error("decoding job payload", "queue", queue, "payload", string(reply), "error", err)
-			err = fmt.Errorf("%w: %v: %s", errorInvalidPayload, err, reply)
+			err = fmt.Errorf("%w: %w: %s", errInvalidPayload, err, reply)
 			if ferr := recordFailure(conn, p.String(), job, err, nil); ferr != nil {
 				logger.Error("recording failure", "queue", queue, "error", ferr)
 			}
-			return nil, errorInvalidPayload
+			return nil, errInvalidPayload
 		}
 		return job, nil
 	}
@@ -145,7 +145,7 @@ func (p *poller) poll(interval time.Duration, quit <-chan struct{}) (<-chan *Job
 			}
 
 			job, err := p.next()
-			if errors.Is(err, errorInvalidPayload) {
+			if errors.Is(err, errInvalidPayload) {
 				continue
 			}
 			if err != nil {

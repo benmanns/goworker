@@ -242,7 +242,7 @@ devenv up       # start Redis in the foreground
 devenv test     # start Redis, then run gofmt, go vet, and go test -race
 ```
 
-Inside the shell, `unit`, `lint`, and `fmt` run the tests, golangci-lint, and gofmt. Without devenv, any Go 1.22+ toolchain works; tests that need Redis use `$REDIS_URL` (default `redis://localhost:6379/`) and are skipped when it is unreachable.
+Inside the shell, `unit`, `lint`, `vulncheck`, and `fmt` run the tests, golangci-lint, govulncheck, and gofmt. Without devenv, any Go 1.22+ toolchain works; tests that need Redis use `$REDIS_URL` (default `redis://localhost:6379/`) and are skipped when it is unreachable.
 
 ## Contributing
 

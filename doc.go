@@ -115,4 +115,139 @@
 //	100.times do
 //	  Resque.enqueue MyClass, ['hi', 'there']
 //	end
+//
+// # Running goworker
+//
+// After building your workers, you will have an
+// executable that you can run which will
+// automatically poll a Redis server and call
+// your workers as jobs arrive.
+//
+// # Flags
+//
+// There are several flags which control the
+// operation of the goworker client.
+//
+// -queues="comma,delimited,queues"
+// — This is the only required flag. The
+// recommended practice is to separate your
+// Resque workers from your goworkers with
+// different queues. Otherwise, Resque worker
+// classes that have no goworker analog will
+// cause the goworker process to fail the jobs.
+// Because of this, there is no default queue,
+// nor is there a way to select all queues (à la
+// Resque's * queue). Queues are processed in
+// the order they are specified.
+// If you have multiple queues you can assign
+// them weights. A queue with a weight of 2 will
+// be checked twice as often as a queue with a
+// weight of 1: -queues='high=2,low=1'.
+//
+// -interval=5.0
+// — Specifies the wait period between polling if
+// no job was in the queue the last time one was
+// requested.
+//
+// -concurrency=25
+// — Specifies the number of concurrently
+// executing workers. This number can be as low
+// as 1 or rather comfortably as high as 100,000,
+// and should be tuned to your workflow and the
+// availability of outside resources.
+//
+// -connections=2
+// — Specifies the maximum number of Redis
+// connections that goworker will consume between
+// the poller and all workers. There is not much
+// performance gain over two and a slight penalty
+// when using only one. This is configurable in
+// case you need to keep connection counts low
+// for cloud Redis providers who limit plans on
+// maxclients.
+//
+// -uri=redis://localhost:6379/
+// — Specifies the URI of the Redis database from
+// which goworker polls for jobs. Accepts URIs of
+// the format redis://user:pass@host:port/db or
+// unix:///path/to/redis.sock. The flag may also
+// be set by the environment variable
+// $($REDIS_PROVIDER) or $REDIS_URL. E.g. set
+// $REDIS_PROVIDER to REDISTOGO_URL on Heroku to
+// let the Redis To Go add-on configure the Redis
+// database.
+//
+// -namespace=resque:
+// — Specifies the namespace from which goworker
+// retrieves jobs and stores stats on workers.
+//
+// -exit-on-complete=false
+// — Exits goworker when there are no jobs left
+// in the queue. This is helpful in conjunction
+// with the time command to benchmark different
+// configurations.
+//
+// -use-number=false
+// — Uses json.Number when decoding numbers in the
+// job payloads. This will avoid issues that
+// occur when goworker and the json package decode
+// large numbers as floats, which then get
+// encoded in scientific notation, losing
+// precision. This will default to true soon.
+//
+// -tls-cert=""
+// — Path to a PEM-encoded CA certificate to trust
+// when connecting with a rediss:// URI.
+//
+// -insecure-tls=false
+// — Skips TLS certificate verification for
+// rediss:// URIs.
+//
+// You can also configure your own flags for use
+// within your workers. Be sure to set them
+// before calling goworker.Work(). It is okay to
+// call flag.Parse() before calling
+// goworker.Work() if you need to do additional
+// processing on your flags.
+//
+// # Signal Handling
+//
+// To stop goworker, send a QUIT, TERM, or INT
+// signal to the process. This will immediately
+// stop job polling. There can be up to
+// $CONCURRENCY jobs currently running, which
+// will continue to run until they are finished.
+// A second signal is handled by the Go runtime's
+// default behavior, which terminates the process.
+//
+// # Failure Modes
+//
+// Like Resque, goworker makes no guarantees
+// about the safety of jobs in the event of
+// process shutdown. Workers must be both
+// idempotent and tolerant to loss of the job in
+// the event of failure.
+//
+// If the process is killed with a KILL or by a
+// system failure, there may be one job that is
+// currently in the poller's buffer that will be
+// lost without any representation in either the
+// queue or the worker variable.
+//
+// If you are running Goworker on a system like
+// Heroku, which sends a TERM to signal a process
+// that it needs to stop, ten seconds later sends
+// a KILL to force the process to stop, your jobs
+// must finish within 10 seconds or they may be
+// lost. Jobs will be recoverable from the Redis
+// database under
+//
+//	resque:worker:<hostname>:<process-id>-<worker-id>:<queues>
+//
+// as a JSON object with keys queue, run_at, and
+// payload, but the process is manual.
+// Additionally, there is no guarantee that the
+// job in Redis under the worker key has not
+// finished, if the process is killed before
+// goworker can flush the update to Redis.
 package goworker

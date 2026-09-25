@@ -102,7 +102,7 @@ func (w *worker) work(jobs <-chan *Job, monitor *sync.WaitGroup) {
 				logger.Debug("done", "queue", job.Queue, "class", job.Payload.Class, "args", job.Payload.Args)
 			} else {
 				err := fmt.Errorf("no worker for %s in queue %s with args %v", job.Payload.Class, job.Queue, job.Payload.Args)
-				logger.Error(err.Error())
+				logger.Error("no worker for job", "queue", job.Queue, "class", job.Payload.Class, "args", job.Payload.Args)
 				w.report(job, err)
 			}
 		}

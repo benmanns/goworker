@@ -16,13 +16,17 @@ import (
 )
 
 var (
-	errorInvalidScheme = errors.New("invalid Redis database URI scheme")
+	errInvalidScheme = errors.New("invalid Redis database URI scheme")
 )
 
+// RedisConn is a connection from the goworker connection
+// pool. See GetConn and PutConn.
 type RedisConn struct {
 	redis.Conn
 }
 
+// Close returns the connection to the pool. It is
+// equivalent to PutConn.
 func (r *RedisConn) Close() {
 	_ = r.Conn.Close()
 }
@@ -82,7 +86,7 @@ func redisConnFromURI(ctx context.Context, uriString string) (redis.Conn, error)
 		if uri.Scheme == "rediss" {
 			dialOptions = append(dialOptions, redis.DialUseTLS(true))
 			config := &tls.Config{
-				InsecureSkipVerify: workerSettings.SkipTLSVerify,
+				InsecureSkipVerify: workerSettings.SkipTLSVerify, //nolint:gosec // opt-in via -insecure-tls
 			}
 			if workerSettings.TLSCertPath != "" {
 				pool, err := getCertPool(workerSettings.TLSCertPath)
@@ -97,7 +101,7 @@ func redisConnFromURI(ctx context.Context, uriString string) (redis.Conn, error)
 		network = "unix"
 		address = uri.Path
 	default:
-		return nil, errorInvalidScheme
+		return nil, errInvalidScheme
 	}
 
 	return redis.DialContext(ctx, network, address, dialOptions...)
@@ -108,7 +112,7 @@ func getCertPool(certPath string) (*x509.CertPool, error) {
 	if rootCAs == nil {
 		rootCAs = x509.NewCertPool()
 	}
-	certs, err := os.ReadFile(certPath)
+	certs, err := os.ReadFile(certPath) //nolint:gosec // the path comes from the -tls-cert setting
 	if err != nil {
 		return nil, fmt.Errorf("reading %q for the root CA pool: %w", certPath, err)
 	}
