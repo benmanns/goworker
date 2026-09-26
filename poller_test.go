@@ -125,6 +125,28 @@ func TestPollerSleepsIntervalWhenIdle(t *testing.T) {
 	})
 }
 
+func TestPollerChecksEachQueueOncePerPass(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		lpops := withFakeRedis(t, nil)
+		// high has weight 3, so it appears three times in the
+		// shuffled list, but once it is empty it is skipped.
+		p, err := newPoller([]string{"high", "high", "high", "low"}, false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		quit := make(chan struct{})
+		jobs, err := p.poll(time.Second, quit)
+		if err != nil {
+			t.Fatal(err)
+		}
+		synctest.Wait()
+		if n := lpops(); n != 2 {
+			t.Fatalf("one pass over empty queues sent %d LPOPs, want 2", n)
+		}
+		stopPoller(t, jobs, quit)
+	})
+}
+
 func TestPollerRetriesAfterRedisErrors(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		lpops := withFakeRedis(t, errors.New("connection reset"))

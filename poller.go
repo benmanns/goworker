@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/gomodule/redigo/redis"
@@ -31,11 +32,18 @@ func newPoller(queues []string, isStrict bool) (*poller, error) {
 // getJob pops the next job off the first non-empty queue.
 // It returns a nil job when every queue is empty.
 func (p *poller) getJob(conn *RedisConn) (*Job, error) {
+	// A weighted queue appears several times in the list; once
+	// it comes back empty, skip it for the rest of this pass.
+	var empty []string
 	for _, queue := range p.queues(p.isStrict) {
+		if slices.Contains(empty, queue) {
+			continue
+		}
 		logger().Debug("checking queue", "queue", queue)
 
 		reply, err := redis.Bytes(conn.Do("LPOP", fmt.Sprintf("%squeue:%s", workerSettings.Namespace, queue)))
 		if errors.Is(err, redis.ErrNil) {
+			empty = append(empty, queue)
 			continue
 		}
 		if err != nil {
