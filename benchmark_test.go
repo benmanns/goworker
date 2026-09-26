@@ -1,6 +1,3 @@
-//go:build go1.13
-// +build go1.13
-
 package goworker
 
 // End-to-end benchmarks against a real Redis server. They use only the
@@ -25,6 +22,7 @@ package goworker
 //	         for a single command or a pipeline (rtt= variants only)
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"net/url"
@@ -46,21 +44,32 @@ func BenchmarkWork(b *testing.B) {
 		for _, c := range []struct{ concurrency, connections int }{{25, 2}, {25, 10}} {
 			name := fmt.Sprintf("rtt=%v/concurrency=%d/connections=%d", rtt, c.concurrency, c.connections)
 			b.Run(name, func(b *testing.B) {
-				benchmarkWork(b, rtt, c.concurrency, c.connections)
+				benchmarkWork(b, rtt, c.concurrency, c.connections, "")
 			})
 		}
+	}
+}
+
+// BenchmarkWorkWeighted polls a weighted queue list where the
+// heavier queue is always empty, so every poll checks it first
+// on most passes.
+func BenchmarkWorkWeighted(b *testing.B) {
+	for _, rtt := range benchmarkRTTs {
+		b.Run(fmt.Sprintf("rtt=%v/queues=empty=3,bench=1", rtt), func(b *testing.B) {
+			benchmarkWork(b, rtt, 25, 2, "empty=3,bench=1")
+		})
 	}
 }
 
 func BenchmarkEnqueue(b *testing.B) {
 	for _, rtt := range benchmarkRTTs {
 		b.Run(fmt.Sprintf("rtt=%v", rtt), func(b *testing.B) {
-			env := newBenchmarkEnv(b, rtt, 1, 2)
+			env := newBenchmarkEnv(b, rtt, 1, 2, "")
 			defer env.cleanup()
-			job := &Job{Queue: "bench", Payload: Payload{Class: "BenchJob", Args: []interface{}{1, "two"}}}
+			job := &Job{Queue: "bench", Payload: Payload{Class: "BenchJob", Args: []any{1, "two"}}}
 
 			env.start(b)
-			for i := 0; i < b.N; i++ {
+			for range b.N {
 				if err := Enqueue(job); err != nil {
 					b.Fatal(err)
 				}
@@ -70,12 +79,13 @@ func BenchmarkEnqueue(b *testing.B) {
 	}
 }
 
-func benchmarkWork(b *testing.B, rtt time.Duration, concurrency, connections int) {
-	env := newBenchmarkEnv(b, rtt, concurrency, connections)
+func benchmarkWork(b *testing.B, rtt time.Duration, concurrency, connections int, queues string) {
+	b.Helper()
+	env := newBenchmarkEnv(b, rtt, concurrency, connections, queues)
 	defer env.cleanup()
 
 	var processed int64
-	Register("BenchJob", func(string, ...interface{}) error {
+	Register("BenchJob", func(string, ...any) error {
 		atomic.AddInt64(&processed, 1)
 		return nil
 	})
@@ -105,7 +115,9 @@ type benchmarkEnv struct {
 	writes    int64
 }
 
-func newBenchmarkEnv(b *testing.B, rtt time.Duration, concurrency, connections int) *benchmarkEnv {
+// newBenchmarkEnv configures goworker for a benchmark. queues is a
+// -queues value; when empty, goworker polls only the "bench" queue.
+func newBenchmarkEnv(b *testing.B, rtt time.Duration, concurrency, connections int, queues string) *benchmarkEnv {
 	b.Helper()
 	env := &benchmarkEnv{
 		addr:      benchmarkRedisAddr(),
@@ -130,9 +142,14 @@ func newBenchmarkEnv(b *testing.B, rtt time.Duration, concurrency, connections i
 	}
 
 	Close()
+	var queueList []string
+	if queues == "" {
+		queueList = []string{"bench"}
+	}
 	SetSettings(WorkerSettings{
 		URI:            "redis://" + target + "/",
-		Queues:         []string{"bench"},
+		QueuesString:   queues,
+		Queues:         queueList,
 		IntervalFloat:  0.01,
 		Concurrency:    concurrency,
 		Connections:    connections,
@@ -146,11 +163,8 @@ func newBenchmarkEnv(b *testing.B, rtt time.Duration, concurrency, connections i
 // push enqueues n jobs directly, outside the timed section.
 func (env *benchmarkEnv) push(b *testing.B, n int) {
 	b.Helper()
-	conn, err := redis.Dial("tcp", env.addr)
-	if err != nil {
-		b.Fatal(err)
-	}
-	defer conn.Close()
+	conn := env.dial(b)
+	defer func() { _ = conn.Close() }()
 	payload := []byte(`{"class":"BenchJob","args":[1,"two"]}`)
 	for sent := 0; sent < n; {
 		batch := 0
@@ -165,7 +179,17 @@ func (env *benchmarkEnv) push(b *testing.B, n int) {
 	}
 }
 
+func (env *benchmarkEnv) dial(b *testing.B) redis.Conn {
+	b.Helper()
+	conn, err := redis.DialContext(b.Context(), "tcp", env.addr)
+	if err != nil {
+		b.Fatal(err)
+	}
+	return conn
+}
+
 func (env *benchmarkEnv) start(b *testing.B) {
+	b.Helper()
 	env.cmds = env.commandsProcessed(b)
 	if env.proxy != nil {
 		env.writes = atomic.LoadInt64(&env.proxy.writes)
@@ -175,6 +199,7 @@ func (env *benchmarkEnv) start(b *testing.B) {
 }
 
 func (env *benchmarkEnv) stop(b *testing.B) {
+	b.Helper()
 	elapsed := time.Since(env.began)
 	b.StopTimer()
 	n := float64(env.n)
@@ -188,18 +213,15 @@ func (env *benchmarkEnv) stop(b *testing.B) {
 
 func (env *benchmarkEnv) commandsProcessed(b *testing.B) int64 {
 	b.Helper()
-	conn, err := redis.Dial("tcp", env.addr)
-	if err != nil {
-		b.Fatal(err)
-	}
-	defer conn.Close()
+	conn := env.dial(b)
+	defer func() { _ = conn.Close() }()
 	info, err := redis.String(conn.Do("INFO", "stats"))
 	if err != nil {
 		b.Fatal(err)
 	}
 	for _, line := range strings.Split(info, "\r\n") {
-		if strings.HasPrefix(line, "total_commands_processed:") {
-			n, _ := strconv.ParseInt(strings.TrimPrefix(line, "total_commands_processed:"), 10, 64)
+		if after, ok := strings.CutPrefix(line, "total_commands_processed:"); ok {
+			n, _ := strconv.ParseInt(after, 10, 64)
 			return n
 		}
 	}
@@ -220,7 +242,7 @@ func (env *benchmarkEnv) cleanup() {
 	if err != nil {
 		return
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 	keys, _ := redis.Strings(conn.Do("KEYS", env.namespace+"*"))
 	for _, key := range keys {
 		_, _ = conn.Do("DEL", key)
@@ -257,7 +279,7 @@ type latencyProxy struct {
 
 func startLatencyProxy(b *testing.B, target string, delay time.Duration) *latencyProxy {
 	b.Helper()
-	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	ln, err := (&net.ListenConfig{}).Listen(b.Context(), "tcp", "127.0.0.1:0")
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -283,7 +305,7 @@ func (p *latencyProxy) serve() {
 		if err != nil {
 			return
 		}
-		server, err := net.Dial("tcp", p.target)
+		server, err := (&net.Dialer{}).DialContext(context.Background(), "tcp", p.target)
 		if err != nil {
 			_ = client.Close()
 			continue
@@ -303,7 +325,7 @@ func (p *latencyProxy) pipe(dst, src net.Conn, count *int64) {
 	}
 	chunks := make(chan chunk, 4096)
 	go func() {
-		defer dst.Close()
+		defer func() { _ = dst.Close() }()
 		for c := range chunks {
 			time.Sleep(time.Until(c.due))
 			if _, err := dst.Write(c.data); err != nil {
