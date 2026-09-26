@@ -32,6 +32,16 @@ func (e *panicError) Error() string {
 // job onto the failed list and updates the failure stats for
 // the process p.
 func recordFailure(conn *RedisConn, p string, job *Job, err error, backtrace []string) error {
+	cmds, err := failureCommands(p, job, err, backtrace)
+	if err != nil {
+		return err
+	}
+	return pipeline(conn, cmds...)
+}
+
+// failureCommands returns the commands that recordFailure sends,
+// so callers can pipeline them with others.
+func failureCommands(p string, job *Job, err error, backtrace []string) ([]redisCommand, error) {
 	if pe, ok := errors.AsType[*panicError](err); ok && backtrace == nil {
 		backtrace = strings.Split(strings.TrimSpace(string(pe.stack)), "\n")
 	}
@@ -49,11 +59,11 @@ func recordFailure(conn *RedisConn, p string, job *Job, err error, backtrace []s
 		Queue:     job.Queue,
 	})
 	if merr != nil {
-		return merr
+		return nil, merr
 	}
-	return pipeline(conn,
+	return []redisCommand{
 		command("RPUSH", fmt.Sprintf("%sfailed", workerSettings.Namespace), buffer),
 		command("INCR", fmt.Sprintf("%sstat:failed", workerSettings.Namespace)),
 		command("INCR", fmt.Sprintf("%sstat:failed:%s", workerSettings.Namespace, p)),
-	)
+	}, nil
 }

@@ -42,24 +42,23 @@ func (w *worker) start(conn *RedisConn, job *Job) error {
 	)
 }
 
-func (w *worker) succeed(conn *RedisConn) error {
-	return pipeline(conn,
-		command("INCR", fmt.Sprintf("%sstat:processed", workerSettings.Namespace)),
-		command("INCR", fmt.Sprintf("%sstat:processed:%s", workerSettings.Namespace, w)),
-	)
-}
-
+// finish records the outcome of job and clears the worker's
+// entry in a single round trip.
 func (w *worker) finish(conn *RedisConn, job *Job, err error) error {
-	var result error
+	var cmds []redisCommand
 	if err != nil {
-		result = recordFailure(conn, w.String(), job, err, nil)
+		failed, ferr := failureCommands(w.String(), job, err, nil)
+		if ferr != nil {
+			return ferr
+		}
+		cmds = failed
 	} else {
-		result = w.succeed(conn)
+		cmds = []redisCommand{
+			command("INCR", fmt.Sprintf("%sstat:processed", workerSettings.Namespace)),
+			command("INCR", fmt.Sprintf("%sstat:processed:%s", workerSettings.Namespace, w)),
+		}
 	}
-	if ferr := w.process.finish(conn); result == nil {
-		result = ferr
-	}
-	return result
+	return pipeline(conn, append(cmds, w.finishCommand())...)
 }
 
 func (w *worker) work(jobs <-chan *Job, monitor *sync.WaitGroup) {

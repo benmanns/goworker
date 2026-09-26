@@ -63,10 +63,13 @@ func (p *process) start(conn *RedisConn) error {
 }
 
 func (p *process) finish(conn *RedisConn) error {
-	return pipeline(conn,
-		command("DEL", fmt.Sprintf("%sworker:%s", workerSettings.Namespace, p)),
-		command("DEL", fmt.Sprintf("%sworker:%s:started", workerSettings.Namespace, p)),
-	)
+	return pipeline(conn, p.finishCommand())
+}
+
+// finishCommand deletes the process's current-job entries.
+func (p *process) finishCommand() redisCommand {
+	key := fmt.Sprintf("%sworker:%s", workerSettings.Namespace, p)
+	return command("DEL", key, key+":started")
 }
 
 func (p *process) queues(strict bool) []string {
