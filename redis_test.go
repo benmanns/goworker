@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"slices"
 	"strings"
 	"syscall"
 	"testing"
@@ -340,5 +341,26 @@ func TestWorkLeavesNoProcessStateInRedis(t *testing.T) {
 	}
 	if n, _ := redis.Int(redisDo(t, "GET", Namespace()+"stat:failed"), nil); n != 1 {
 		t.Errorf("stat:failed = %d, want 1", n)
+	}
+}
+
+func TestStrictQueueOrder(t *testing.T) {
+	setupRedisTest(t, "high", "low")
+	workerSettings.Concurrency = 1
+	var order []string
+	Register("Ordered", func(queue string, _ ...any) error {
+		order = append(order, queue)
+		return nil
+	})
+	for _, q := range []string{"low", "high", "low", "high"} {
+		if err := Enqueue(&Job{Queue: q, Payload: Payload{Class: "Ordered"}}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := Work(); err != nil {
+		t.Fatal(err)
+	}
+	if want := []string{"high", "high", "low", "low"}; !slices.Equal(order, want) {
+		t.Errorf("processed queues in order %v, want %v", order, want)
 	}
 }

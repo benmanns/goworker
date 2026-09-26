@@ -36,6 +36,13 @@ called out below.
 - Zero values for `IntervalFloat`, `Concurrency`, `Connections`, and `URI`
   in `SetSettings` fall back to the flag defaults.
 - The `worker:…:started` timestamp uses Resque's format.
+- The poller fetches a job with a small Lua script (`EVALSHA`) that pops
+  from the first non-empty queue and updates the poller's stat in one
+  round trip, instead of one `LPOP` per queue plus an `INCR`. Redis must
+  allow scripting, which every supported Redis version and most managed
+  services do.
+- Finishing a job records its result and clears the worker's entry in
+  one round trip.
 
 ### Fixed
 

@@ -2,6 +2,7 @@ package goworker
 
 import (
 	"errors"
+	"slices"
 	"sync"
 	"testing"
 	"testing/synctest"
@@ -10,15 +11,28 @@ import (
 	"github.com/gomodule/redigo/redis"
 )
 
-// fakeConn is an in-memory redis.Conn. Every queue is empty,
-// LPOP fails with lpopErr if set, and every other command
-// succeeds. It never touches the network, so synctest's fake
-// clock can advance while the poller waits.
+// fakeConn is an in-memory redis.Conn. Every queue is empty:
+// the poller's pop script (EVALSHA) finds nothing, or fails with
+// fetchErr if set, and every other command succeeds. It never
+// touches the network, so synctest's fake clock can advance
+// while the poller waits.
 type fakeConn struct {
-	mu      *sync.Mutex
-	lpops   *int
-	lpopErr error
-	pending int
+	stats    *fakeStats
+	fetchErr error
+	pending  int
+}
+
+// fakeStats records the poller's fetches across connections.
+type fakeStats struct {
+	mu          sync.Mutex
+	fetches     int
+	queueCounts []int // queue keys passed to each fetch
+}
+
+func (s *fakeStats) get() (fetches int, queueCounts []int) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.fetches, slices.Clone(s.queueCounts)
 }
 
 func (c *fakeConn) Close() error { return nil }
@@ -35,7 +49,7 @@ func (c *fakeConn) Receive() (any, error) {
 	return "OK", nil
 }
 
-func (c *fakeConn) Do(cmd string, _ ...any) (any, error) {
+func (c *fakeConn) Do(cmd string, args ...any) (any, error) {
 	switch cmd {
 	case "":
 		replies := make([]any, c.pending)
@@ -44,38 +58,39 @@ func (c *fakeConn) Do(cmd string, _ ...any) (any, error) {
 		}
 		c.pending = 0
 		return replies, nil
-	case "LPOP":
-		c.mu.Lock()
-		*c.lpops++
-		c.mu.Unlock()
-		return nil, c.lpopErr
+	case "EVALSHA":
+		numKeys, _ := args[1].(int)
+		c.stats.mu.Lock()
+		c.stats.fetches++
+		c.stats.queueCounts = append(c.stats.queueCounts, numKeys-1) // the last key is the stat
+		c.stats.mu.Unlock()
+		return nil, c.fetchErr
 	}
 	return "OK", nil
 }
 
 // withFakeRedis points goworker at fake connections for the
-// duration of the test and returns a function that reports how
-// many LPOPs the poller has issued.
-func withFakeRedis(t *testing.T, lpopErr error) (lpops func() int) {
+// duration of the test and returns their shared stats.
+func withFakeRedis(t *testing.T, fetchErr error) *fakeStats {
 	t.Helper()
-	var mu sync.Mutex
-	var n int
+	stats := &fakeStats{}
 	oldPool, oldSettings := pool, workerSettings
 	t.Cleanup(func() { pool, workerSettings = oldPool, oldSettings })
 
 	workerSettings = WorkerSettings{Namespace: "test:"}
 	pool = &redis.Pool{
 		Dial: func() (redis.Conn, error) {
-			return &fakeConn{mu: &mu, lpops: &n, lpopErr: lpopErr}, nil
+			return &fakeConn{stats: stats, fetchErr: fetchErr}, nil
 		},
 		MaxActive: 2,
 		Wait:      true,
 	}
-	return func() int {
-		mu.Lock()
-		defer mu.Unlock()
-		return n
-	}
+	return stats
+}
+
+func fetches(stats *fakeStats) int {
+	n, _ := stats.get()
+	return n
 }
 
 func startPoller(t *testing.T, interval time.Duration) (jobs <-chan *Job, quit chan struct{}) {
@@ -108,17 +123,17 @@ func stopPoller(t *testing.T, jobs <-chan *Job, quit chan struct{}) {
 
 func TestPollerSleepsIntervalWhenIdle(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-		lpops := withFakeRedis(t, nil)
+		stats := withFakeRedis(t, nil)
 		jobs, quit := startPoller(t, time.Second)
 
 		synctest.Wait()
-		if n := lpops(); n != 1 {
-			t.Fatalf("after start: %d LPOPs, want 1", n)
+		if n := fetches(stats); n != 1 {
+			t.Fatalf("after start: %d fetches, want 1", n)
 		}
 		time.Sleep(10*time.Second + time.Millisecond)
 		synctest.Wait()
-		if n := lpops(); n != 11 {
-			t.Fatalf("after 10 intervals: %d LPOPs, want 11", n)
+		if n := fetches(stats); n != 11 {
+			t.Fatalf("after 10 intervals: %d fetches, want 11", n)
 		}
 
 		stopPoller(t, jobs, quit)
@@ -127,9 +142,9 @@ func TestPollerSleepsIntervalWhenIdle(t *testing.T) {
 
 func TestPollerChecksEachQueueOncePerPass(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-		lpops := withFakeRedis(t, nil)
+		stats := withFakeRedis(t, nil)
 		// high has weight 3, so it appears three times in the
-		// shuffled list, but once it is empty it is skipped.
+		// shuffled list, but each queue is only checked once.
 		p, err := newPoller([]string{"high", "high", "high", "low"}, false)
 		if err != nil {
 			t.Fatal(err)
@@ -140,8 +155,9 @@ func TestPollerChecksEachQueueOncePerPass(t *testing.T) {
 			t.Fatal(err)
 		}
 		synctest.Wait()
-		if n := lpops(); n != 2 {
-			t.Fatalf("one pass over empty queues sent %d LPOPs, want 2", n)
+		n, queueCounts := stats.get()
+		if n != 1 || !slices.Equal(queueCounts, []int{2}) {
+			t.Fatalf("one pass: %d fetches with %v queue keys, want 1 fetch with 2", n, queueCounts)
 		}
 		stopPoller(t, jobs, quit)
 	})
@@ -149,15 +165,15 @@ func TestPollerChecksEachQueueOncePerPass(t *testing.T) {
 
 func TestPollerRetriesAfterRedisErrors(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-		lpops := withFakeRedis(t, errors.New("connection reset"))
+		stats := withFakeRedis(t, errors.New("connection reset"))
 		jobs, quit := startPoller(t, time.Second)
 
 		// Before the fix, the first error stopped the poller
 		// for good. Now it waits an interval and tries again.
 		time.Sleep(5*time.Second + time.Millisecond)
 		synctest.Wait()
-		if n := lpops(); n != 6 {
-			t.Fatalf("after 5 intervals of errors: %d LPOPs, want 6", n)
+		if n := fetches(stats); n != 6 {
+			t.Fatalf("after 5 intervals of errors: %d fetches, want 6", n)
 		}
 		select {
 		case <-jobs:
@@ -171,7 +187,7 @@ func TestPollerRetriesAfterRedisErrors(t *testing.T) {
 
 func TestPollerExitsOnCompleteWithoutWaiting(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-		lpops := withFakeRedis(t, nil)
+		stats := withFakeRedis(t, nil)
 		workerSettings.ExitOnComplete = true
 		p, err := newPoller([]string{"q"}, true)
 		if err != nil {
@@ -188,8 +204,8 @@ func TestPollerExitsOnCompleteWithoutWaiting(t *testing.T) {
 		if waited := time.Since(start); waited != 0 {
 			t.Errorf("exit-on-complete waited %v, want no waiting", waited)
 		}
-		if n := lpops(); n != 1 {
-			t.Errorf("%d LPOPs, want 1", n)
+		if n := fetches(stats); n != 1 {
+			t.Errorf("%d fetches, want 1", n)
 		}
 	})
 }

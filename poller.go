@@ -29,49 +29,77 @@ func newPoller(queues []string, isStrict bool) (*poller, error) {
 	}, nil
 }
 
+// popScript pops the first job it finds in KEYS[1] .. KEYS[n-1],
+// in order, and increments the poller's processed stat, KEYS[n],
+// all in one round trip. It returns the 1-based index of the queue
+// and the job, or nil when every queue is empty.
+var popScript = redis.NewScript(-1, `
+for i = 1, #KEYS - 1 do
+  local job = redis.call('LPOP', KEYS[i])
+  if job then
+    redis.call('INCR', KEYS[#KEYS])
+    return {i, job}
+  end -- if
+end -- for
+return false
+`)
+
 // getJob pops the next job off the first non-empty queue.
 // It returns a nil job when every queue is empty.
 func (p *poller) getJob(conn *RedisConn) (*Job, error) {
-	// A weighted queue appears several times in the list; once
-	// it comes back empty, skip it for the rest of this pass.
-	var empty []string
+	// A weighted queue appears several times in the shuffled
+	// list. Checking it again after it was empty is pointless,
+	// so pass each queue once, at its first position.
+	var queues []string
 	for _, queue := range p.queues(p.isStrict) {
-		if slices.Contains(empty, queue) {
-			continue
+		if !slices.Contains(queues, queue) {
+			queues = append(queues, queue)
 		}
-		logger().Debug("checking queue", "queue", queue)
+	}
+	args := make([]any, 0, len(queues)+2)
+	args = append(args, len(queues)+1)
+	for _, queue := range queues {
+		args = append(args, fmt.Sprintf("%squeue:%s", workerSettings.Namespace, queue))
+	}
+	args = append(args, fmt.Sprintf("%sstat:processed:%v", workerSettings.Namespace, p))
 
-		reply, err := redis.Bytes(conn.Do("LPOP", fmt.Sprintf("%squeue:%s", workerSettings.Namespace, queue)))
-		if errors.Is(err, redis.ErrNil) {
-			empty = append(empty, queue)
-			continue
-		}
-		if err != nil {
-			return nil, err
-		}
-		logger().Debug("found job", "queue", queue)
+	logger().Debug("checking queues", "queues", queues)
+	values, err := redis.Values(popScript.Do(conn.Conn, args...))
+	if errors.Is(err, redis.ErrNil) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	var index int
+	var reply []byte
+	if _, err := redis.Scan(values, &index, &reply); err != nil {
+		return nil, err
+	}
+	if index < 1 || index > len(queues) {
+		return nil, fmt.Errorf("pop script returned queue index %d for %d queues", index, len(queues))
+	}
+	queue := queues[index-1]
+	logger().Debug("found job", "queue", queue)
 
-		job := &Job{Queue: queue}
+	job := &Job{Queue: queue}
 
-		decoder := json.NewDecoder(bytes.NewReader(reply))
-		if workerSettings.UseNumber {
-			decoder.UseNumber()
-		}
-
-		if err := decoder.Decode(&job.Payload); err != nil {
-			// The job is already off the queue, so record it
-			// as failed rather than silently dropping it.
-			logger().Error("decoding job payload", "queue", queue, "payload", string(reply), "error", err)
-			err = fmt.Errorf("%w: %w: %s", errInvalidPayload, err, reply)
-			if ferr := recordFailure(conn, p.String(), job, err, nil); ferr != nil {
-				logger().Error("recording failure", "queue", queue, "error", ferr)
-			}
-			return nil, errInvalidPayload
-		}
-		return job, nil
+	decoder := json.NewDecoder(bytes.NewReader(reply))
+	if workerSettings.UseNumber {
+		decoder.UseNumber()
 	}
 
-	return nil, nil
+	if err := decoder.Decode(&job.Payload); err != nil {
+		// The job is already off the queue, so record it
+		// as failed rather than silently dropping it.
+		logger().Error("decoding job payload", "queue", queue, "payload", string(reply), "error", err)
+		err = fmt.Errorf("%w: %w: %s", errInvalidPayload, err, reply)
+		if ferr := recordFailure(conn, p.String(), job, err, nil); ferr != nil {
+			logger().Error("recording failure", "queue", queue, "error", ferr)
+		}
+		return nil, errInvalidPayload
+	}
+	return job, nil
 }
 
 // next checks out a connection and pops the next job.
@@ -81,15 +109,7 @@ func (p *poller) next() (*Job, error) {
 		return nil, err
 	}
 	defer PutConn(conn)
-
-	job, err := p.getJob(conn)
-	if err != nil || job == nil {
-		return nil, err
-	}
-	if _, err := conn.Do("INCR", fmt.Sprintf("%sstat:processed:%v", workerSettings.Namespace, p)); err != nil {
-		logger().Error("updating poller stats", "poller", p, "error", err)
-	}
-	return job, nil
+	return p.getJob(conn)
 }
 
 // requeue pushes a job that was popped but never handed to
