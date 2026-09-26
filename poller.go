@@ -121,7 +121,10 @@ func (p *poller) poll(interval time.Duration, quit <-chan struct{}) (<-chan *Job
 
 	go func() {
 		defer func() {
-			close(jobs)
+			// Close jobs last: Work returns, and closes the
+			// connection pool, once workers see it closed, so
+			// the poller must unregister itself first.
+			defer close(jobs)
 
 			conn, err := GetConn()
 			if err != nil {

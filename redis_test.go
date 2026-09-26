@@ -20,8 +20,16 @@ func TestMain(m *testing.M) {
 	if !testing.Verbose() {
 		SetLogger(slog.New(slog.DiscardHandler))
 	}
-	os.Exit(m.Run())
+	code := m.Run()
+	if code == 0 && checkGoroutineLeaks != nil {
+		code = checkGoroutineLeaks()
+	}
+	os.Exit(code)
 }
+
+// checkGoroutineLeaks is set by leak_test.go on Go versions
+// that have the goroutineleak profile.
+var checkGoroutineLeaks func() int
 
 // setupRedisTest points goworker at a fresh namespace on the
 // Redis server from $REDIS_URL (default localhost:6379) and

@@ -15,7 +15,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # The minimum version from go.mod plus the latest release.
+        # The minimum version from go.mod plus the latest release. On
+        # Go 1.27 and later, leak_test.go also checks for leaked
+        # goroutines after the suite.
         go: ["1.26", stable]
         redis: ["6", "7"]
 

@@ -41,6 +41,8 @@ called out below.
 
 - Queues were duplicated each time `Init` ran after `Close`.
 - Signal handling stayed installed after `Work` returned.
+- The poller could unregister itself after `Work` had closed the
+  connection pool, leaving a stale entry in the Resque workers set.
 - A worker could stop consuming jobs after a Redis connection error.
 - `Enqueue` ignored Redis error replies.
 - `-insecure-tls` was ignored when `-tls-cert` was set.
