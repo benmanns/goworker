@@ -4,6 +4,6 @@ package goworker
 // selects which registered worker function runs, and the
 // arguments passed to it.
 type Payload struct {
-	Class string        `json:"class"`
-	Args  []interface{} `json:"args"`
+	Class string `json:"class"`
+	Args  []any  `json:"args"`
 }

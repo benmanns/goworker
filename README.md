@@ -9,7 +9,7 @@ goworker workers can run alongside Ruby Resque clients so that you can keep all 
 
 ## Installation
 
-goworker requires Go 1.22 or later. To add it to your module, use
+goworker requires Go 1.26 or later. To add it to your module, use
 
 ```sh
 go get github.com/benmanns/goworker@latest
@@ -26,7 +26,7 @@ import "github.com/benmanns/goworker"
 To create a worker, write a function matching the signature
 
 ```go
-func(string, ...interface{}) error
+func(string, ...any) error
 ```
 
 and register it using
@@ -45,7 +45,7 @@ import (
 	"github.com/benmanns/goworker"
 )
 
-func myFunc(queue string, args ...interface{}) error {
+func myFunc(queue string, args ...any) error {
 	fmt.Printf("From %s, %v\n", queue, args)
 	return nil
 }
@@ -71,9 +71,9 @@ import (
 	"github.com/benmanns/goworker"
 )
 
-func newMyFunc(uri string) (func(queue string, args ...interface{}) error) {
+func newMyFunc(uri string) (func(queue string, args ...any) error) {
 	foo := NewFoo(uri)
-	return func(queue string, args ...interface{}) error {
+	return func(queue string, args ...any) error {
 		foo.Bar(args)
 		return nil
 	}
@@ -100,7 +100,7 @@ import (
 	"github.com/benmanns/goworker"
 )
 
-func myFunc(queue string, args ...interface{}) error {
+func myFunc(queue string, args ...any) error {
 	fmt.Printf("From %s, %v\n", queue, args)
 	return nil
 }
@@ -131,7 +131,7 @@ goworker worker functions receive the queue they are serving and a slice of inte
 
 ```go
 // Expecting (int, string, float64)
-func myFunc(queue string, args ...interface{}) error {
+func myFunc(queue string, args ...any) error {
 	idNum, ok := args[0].(json.Number)
 	if !ok {
 		return errorInvalidParam
@@ -182,7 +182,7 @@ goworker.Enqueue(&goworker.Job{
     Queue: "myqueue",
     Payload: goworker.Payload{
         Class: "MyClass",
-        Args: []interface{}{"hi", "there"},
+        Args: []any{"hi", "there"},
     },
 })
 ```
@@ -242,7 +242,7 @@ devenv up       # start Redis in the foreground
 devenv test     # start Redis, then run gofmt, go vet, and go test -race
 ```
 
-Without devenv, any Go 1.22+ toolchain works; tests that need Redis use `$REDIS_URL` (default `redis://localhost:6379/`) and are skipped when it is unreachable.
+Without devenv, any Go 1.26+ toolchain works; tests that need Redis use `$REDIS_URL` (default `redis://localhost:6379/`) and are skipped when it is unreachable.
 
 ## Contributing
 

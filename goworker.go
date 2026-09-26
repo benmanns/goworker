@@ -7,13 +7,13 @@ import (
 	"os"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/gomodule/redigo/redis"
 )
 
 var (
-	logger      = slog.New(slog.NewTextHandler(os.Stdout, nil))
 	pool        *redis.Pool
 	initMutex   sync.Mutex
 	initialized bool
@@ -50,10 +50,27 @@ func SetSettings(settings WorkerSettings) {
 }
 
 // SetLogger replaces the logger goworker writes to. By
-// default goworker logs at the info level to stdout. Call
-// SetLogger before Init or Work.
+// default goworker logs at the info level to stdout. It is
+// safe to call at any time; a nil logger restores the default.
 func SetLogger(l *slog.Logger) {
-	logger = l
+	if l == nil {
+		l = defaultLogger
+	}
+	currentLogger.Store(l)
+}
+
+var (
+	defaultLogger = slog.New(slog.NewTextHandler(os.Stdout, nil))
+	currentLogger atomic.Pointer[slog.Logger]
+)
+
+// logger returns the logger set with SetLogger, or the
+// default logger. It is safe to call while SetLogger runs.
+func logger() *slog.Logger {
+	if l := currentLogger.Load(); l != nil {
+		return l
+	}
+	return defaultLogger
 }
 
 // Init initializes the goworker process. This will be
@@ -116,7 +133,7 @@ func Close() {
 	defer initMutex.Unlock()
 	if initialized {
 		if err := pool.Close(); err != nil {
-			logger.Error("closing Redis pool", "error", err)
+			logger().Error("closing Redis pool", "error", err)
 		}
 		initialized = false
 	}

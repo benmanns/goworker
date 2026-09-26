@@ -47,14 +47,14 @@ func Enqueue(job *Job) error {
 
 	conn, err := GetConn()
 	if err != nil {
-		logger.Error("getting connection on enqueue", "error", err)
+		logger().Error("getting connection on enqueue", "error", err)
 		return err
 	}
 	defer PutConn(conn)
 
 	buffer, err := json.Marshal(job.Payload)
 	if err != nil {
-		logger.Error("marshaling payload on enqueue", "error", err)
+		logger().Error("marshaling payload on enqueue", "error", err)
 		return err
 	}
 
@@ -63,7 +63,7 @@ func Enqueue(job *Job) error {
 		command("RPUSH", fmt.Sprintf("%squeue:%s", workerSettings.Namespace, job.Queue), buffer),
 	)
 	if err != nil {
-		logger.Error("pushing to queue", "queue", job.Queue, "error", err)
+		logger().Error("pushing to queue", "queue", job.Queue, "error", err)
 		return err
 	}
 	return nil

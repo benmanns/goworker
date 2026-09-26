@@ -32,7 +32,7 @@ func newPoller(queues []string, isStrict bool) (*poller, error) {
 // It returns a nil job when every queue is empty.
 func (p *poller) getJob(conn *RedisConn) (*Job, error) {
 	for _, queue := range p.queues(p.isStrict) {
-		logger.Debug("checking queue", "queue", queue)
+		logger().Debug("checking queue", "queue", queue)
 
 		reply, err := redis.Bytes(conn.Do("LPOP", fmt.Sprintf("%squeue:%s", workerSettings.Namespace, queue)))
 		if errors.Is(err, redis.ErrNil) {
@@ -41,7 +41,7 @@ func (p *poller) getJob(conn *RedisConn) (*Job, error) {
 		if err != nil {
 			return nil, err
 		}
-		logger.Debug("found job", "queue", queue)
+		logger().Debug("found job", "queue", queue)
 
 		job := &Job{Queue: queue}
 
@@ -53,10 +53,10 @@ func (p *poller) getJob(conn *RedisConn) (*Job, error) {
 		if err := decoder.Decode(&job.Payload); err != nil {
 			// The job is already off the queue, so record it
 			// as failed rather than silently dropping it.
-			logger.Error("decoding job payload", "queue", queue, "payload", string(reply), "error", err)
+			logger().Error("decoding job payload", "queue", queue, "payload", string(reply), "error", err)
 			err = fmt.Errorf("%w: %w: %s", errInvalidPayload, err, reply)
 			if ferr := recordFailure(conn, p.String(), job, err, nil); ferr != nil {
-				logger.Error("recording failure", "queue", queue, "error", ferr)
+				logger().Error("recording failure", "queue", queue, "error", ferr)
 			}
 			return nil, errInvalidPayload
 		}
@@ -79,7 +79,7 @@ func (p *poller) next() (*Job, error) {
 		return nil, err
 	}
 	if _, err := conn.Do("INCR", fmt.Sprintf("%sstat:processed:%v", workerSettings.Namespace, p)); err != nil {
-		logger.Error("updating poller stats", "poller", p, "error", err)
+		logger().Error("updating poller stats", "poller", p, "error", err)
 	}
 	return job, nil
 }
@@ -104,7 +104,7 @@ func (p *poller) requeue(job *Job) error {
 func (p *poller) poll(interval time.Duration, quit <-chan struct{}) (<-chan *Job, error) {
 	conn, err := GetConn()
 	if err != nil {
-		logger.Error("getting connection in poller", "poller", p, "error", err)
+		logger().Error("getting connection in poller", "poller", p, "error", err)
 		return nil, err
 	}
 	err = p.open(conn)
@@ -113,7 +113,7 @@ func (p *poller) poll(interval time.Duration, quit <-chan struct{}) (<-chan *Job
 	}
 	PutConn(conn)
 	if err != nil {
-		logger.Error("registering poller", "poller", p, "error", err)
+		logger().Error("registering poller", "poller", p, "error", err)
 		return nil, err
 	}
 
@@ -125,15 +125,15 @@ func (p *poller) poll(interval time.Duration, quit <-chan struct{}) (<-chan *Job
 
 			conn, err := GetConn()
 			if err != nil {
-				logger.Error("getting connection in poller", "poller", p, "error", err)
+				logger().Error("getting connection in poller", "poller", p, "error", err)
 				return
 			}
 			defer PutConn(conn)
 			if err := p.finish(conn); err != nil {
-				logger.Error("finishing poller", "poller", p, "error", err)
+				logger().Error("finishing poller", "poller", p, "error", err)
 			}
 			if err := p.close(conn); err != nil {
-				logger.Error("unregistering poller", "poller", p, "error", err)
+				logger().Error("unregistering poller", "poller", p, "error", err)
 			}
 		}()
 
@@ -152,7 +152,7 @@ func (p *poller) poll(interval time.Duration, quit <-chan struct{}) (<-chan *Job
 				// Redis errors are usually transient (a restart,
 				// a failover, a dropped connection). Back off and
 				// retry instead of shutting the worker down.
-				logger.Error("getting job", "poller", p, "queues", p.Queues, "error", err)
+				logger().Error("getting job", "poller", p, "queues", p.Queues, "error", err)
 				if !sleep(interval, quit) {
 					return
 				}
@@ -163,7 +163,7 @@ func (p *poller) poll(interval time.Duration, quit <-chan struct{}) (<-chan *Job
 				if workerSettings.ExitOnComplete {
 					return
 				}
-				logger.Debug("no jobs found; sleeping", "interval", interval, "queues", p.Queues)
+				logger().Debug("no jobs found; sleeping", "interval", interval, "queues", p.Queues)
 				if !sleep(interval, quit) {
 					return
 				}
@@ -174,7 +174,7 @@ func (p *poller) poll(interval time.Duration, quit <-chan struct{}) (<-chan *Job
 			case jobs <- job:
 			case <-quit:
 				if err := p.requeue(job); err != nil {
-					logger.Error("requeueing job", "queue", job.Queue, "class", job.Payload.Class, "error", err)
+					logger().Error("requeueing job", "queue", job.Queue, "class", job.Payload.Class, "error", err)
 				}
 				return
 			}

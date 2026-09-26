@@ -11,7 +11,7 @@
 // To create a worker, write a function matching the
 // signature
 //
-//	func(string, ...interface{}) error
+//	func(string, ...any) error
 //
 // and register it using
 //
@@ -26,7 +26,7 @@
 //		"github.com/benmanns/goworker"
 //	)
 //
-//	func myFunc(queue string, args ...interface{}) error {
+//	func myFunc(queue string, args ...any) error {
 //		fmt.Printf("From %s, %v\n", queue, args)
 //		return nil
 //	}
@@ -51,9 +51,9 @@
 //		"github.com/benmanns/goworker"
 //	)
 //
-//	func newMyFunc(uri string) (func(queue string, args ...interface{}) error) {
+//	func newMyFunc(uri string) (func(queue string, args ...any) error) {
 //		foo := NewFoo(uri)
-//		return func(queue string, args ...interface{}) error {
+//		return func(queue string, args ...any) error {
 //			foo.Bar(args)
 //			return nil
 //		}
@@ -75,7 +75,7 @@
 // to convert them into usable types.
 //
 //	// Expecting (int, string, float64)
-//	func myFunc(queue string, args ...interface{}) error {
+//	func myFunc(queue string, args ...any) error {
 //		idNum, ok := args[0].(json.Number)
 //		if !ok {
 //			return errorInvalidParam

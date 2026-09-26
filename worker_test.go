@@ -8,7 +8,7 @@ import (
 )
 
 func TestEnqueue(t *testing.T) {
-	expectedArgs := []interface{}{"a", "lot", "of", "params"}
+	expectedArgs := []any{"a", "lot", "of", "params"}
 	jobName := "SomethingCool"
 	queueName := "testQueue"
 	expectedJob := &Job{
@@ -26,9 +26,9 @@ func TestEnqueue(t *testing.T) {
 		t.Errorf("Error while enqueue %s", err)
 	}
 
-	actualArgs := []interface{}{}
+	actualArgs := []any{}
 	actualQueueName := ""
-	Register(jobName, func(queue string, args ...interface{}) error {
+	Register(jobName, func(queue string, args ...any) error {
 		actualArgs = args
 		actualQueueName = queue
 		return nil
@@ -49,7 +49,7 @@ func TestRegister(t *testing.T) {
 	t.Run("test normal registration", func(_ *testing.T) {
 		name := "oneWorker"
 
-		Register(name, func(string, ...interface{}) error {
+		Register(name, func(string, ...any) error {
 			return nil
 		})
 	})
@@ -58,13 +58,11 @@ func TestRegister(t *testing.T) {
 
 		var wg sync.WaitGroup
 		for i := 1; i <= 10; i++ {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				Register(fmt.Sprintf(name, i), func(string, ...interface{}) error {
+			wg.Go(func() {
+				Register(fmt.Sprintf(name, i), func(string, ...any) error {
 					return nil
 				})
-			}()
+			})
 		}
 		wg.Wait()
 		for i := 1; i <= 10; i++ {

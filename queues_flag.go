@@ -3,6 +3,7 @@ package goworker
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -15,7 +16,7 @@ var (
 type queuesFlag []string
 
 func (q *queuesFlag) Set(value string) error {
-	for _, queueAndWeight := range strings.Split(value, ",") {
+	for queueAndWeight := range strings.SplitSeq(value, ",") {
 		if queueAndWeight == "" {
 			continue
 		}
@@ -25,9 +26,7 @@ func (q *queuesFlag) Set(value string) error {
 			return err
 		}
 
-		for range weight {
-			*q = append(*q, queue)
-		}
+		*q = append(*q, slices.Repeat([]string{queue}, max(weight, 0))...)
 	}
 	if len(*q) == 0 {
 		return errEmptyQueues
@@ -40,17 +39,15 @@ func (q *queuesFlag) String() string {
 }
 
 func parseQueueAndWeight(queueAndWeight string) (queue string, weight int, err error) {
-	parts := strings.SplitN(queueAndWeight, "=", 2)
-	queue = parts[0]
-
+	queue, weightString, weighted := strings.Cut(queueAndWeight, "=")
 	if queue == "" {
 		return
 	}
 
-	if len(parts) == 1 {
+	if !weighted {
 		weight = 1
 	} else {
-		weight, err = strconv.Atoi(parts[1])
+		weight, err = strconv.Atoi(weightString)
 		if err != nil {
 			err = errNonNumericWeight
 		}

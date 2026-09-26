@@ -20,7 +20,7 @@ type failure struct {
 
 // panicError is returned for a worker function that panicked.
 type panicError struct {
-	value interface{}
+	value any
 	stack []byte
 }
 
@@ -32,8 +32,7 @@ func (e *panicError) Error() string {
 // job onto the failed list and updates the failure stats for
 // the process p.
 func recordFailure(conn *RedisConn, p string, job *Job, err error, backtrace []string) error {
-	var pe *panicError
-	if backtrace == nil && errors.As(err, &pe) {
+	if pe, ok := errors.AsType[*panicError](err); ok && backtrace == nil {
 		backtrace = strings.Split(strings.TrimSpace(string(pe.stack)), "\n")
 	}
 	if backtrace == nil {

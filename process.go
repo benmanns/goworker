@@ -2,7 +2,7 @@ package goworker
 
 import (
 	"fmt"
-	"math/rand"
+	"math/rand/v2"
 	"os"
 	"strings"
 	"time"
@@ -48,7 +48,7 @@ func (p *process) open(conn *RedisConn) error {
 }
 
 func (p *process) close(conn *RedisConn) error {
-	logger.Info("shutdown", "process", p)
+	logger().Info("shutdown", "process", p)
 	return pipeline(conn,
 		command("SREM", fmt.Sprintf("%sworkers", workerSettings.Namespace), p),
 		command("DEL", fmt.Sprintf("%sstat:processed:%s", workerSettings.Namespace, p)),
@@ -79,7 +79,7 @@ func (p *process) queues(strict bool) []string {
 	// The shuffle only spreads polling across weighted queues, so it
 	// does not need a cryptographic source.
 	queues := make([]string, len(p.Queues))
-	for i, v := range rand.Perm(len(p.Queues)) { //nolint:gosec,nolintlint // G404: load balancing, not security (older golangci-lint does not flag it)
+	for i, v := range rand.Perm(len(p.Queues)) { //nolint:gosec // G404: load balancing, not security
 		queues[i] = p.Queues[v]
 	}
 	return queues
@@ -87,10 +87,10 @@ func (p *process) queues(strict bool) []string {
 
 type redisCommand struct {
 	name string
-	args []interface{}
+	args []any
 }
 
-func command(name string, args ...interface{}) redisCommand {
+func command(name string, args ...any) redisCommand {
 	return redisCommand{name: name, args: args}
 }
 

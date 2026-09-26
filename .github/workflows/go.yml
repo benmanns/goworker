@@ -15,9 +15,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # The minimum version from go.mod plus the two releases the Go
-        # team currently supports.
-        go: ["1.22", oldstable, stable]
+        # The minimum version from go.mod plus the latest release.
+        go: ["1.26", stable]
         redis: ["6", "7"]
 
     services:

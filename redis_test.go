@@ -1,12 +1,10 @@
 package goworker
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
-	"io"
 	"log/slog"
 	"os"
 	"strings"
@@ -20,7 +18,7 @@ import (
 func TestMain(m *testing.M) {
 	flag.Parse()
 	if !testing.Verbose() {
-		SetLogger(slog.New(slog.NewTextHandler(io.Discard, nil)))
+		SetLogger(slog.New(slog.DiscardHandler))
 	}
 	os.Exit(m.Run())
 }
@@ -69,7 +67,7 @@ func setupRedisTest(t *testing.T, queues ...string) {
 	}
 }
 
-func redisDo(t *testing.T, cmd string, args ...interface{}) interface{} {
+func redisDo(t *testing.T, cmd string, args ...any) any {
 	t.Helper()
 	// Work closes the pool when it returns.
 	if err := Init(); err != nil {
@@ -107,7 +105,7 @@ func failures(t *testing.T) []failure {
 func TestInvalidPayloadIsRecordedAndPollingContinues(t *testing.T) {
 	setupRedisTest(t, "q")
 	var ran int
-	Register("InvalidPayloadNeighbor", func(string, ...interface{}) error {
+	Register("InvalidPayloadNeighbor", func(string, ...any) error {
 		ran++
 		return nil
 	})
@@ -130,7 +128,7 @@ func TestInvalidPayloadIsRecordedAndPollingContinues(t *testing.T) {
 
 func TestPanicIsRecordedWithBacktrace(t *testing.T) {
 	setupRedisTest(t, "q")
-	Register("Panics", func(string, ...interface{}) error {
+	Register("Panics", func(string, ...any) error {
 		panic("boom")
 	})
 	if err := Enqueue(&Job{Queue: "q", Payload: Payload{Class: "Panics"}}); err != nil {
@@ -153,7 +151,7 @@ func TestPanicIsRecordedWithBacktrace(t *testing.T) {
 
 func TestErrorAndMissingWorkerAreRecorded(t *testing.T) {
 	setupRedisTest(t, "q")
-	Register("Errors", func(string, ...interface{}) error {
+	Register("Errors", func(string, ...any) error {
 		return errors.New("nope")
 	})
 	for _, class := range []string{"Errors", "NobodyHandlesThis"} {
@@ -236,7 +234,7 @@ func TestSetSettingsZeroValuesGetDefaults(t *testing.T) {
 
 func TestRedisConnFromURIErrors(t *testing.T) {
 	for _, uri := range []string{"http://localhost:6379/", "redis://localhost:6379/notadb"} {
-		if _, err := redisConnFromURI(context.Background(), uri); err == nil {
+		if _, err := redisConnFromURI(t.Context(), uri); err == nil {
 			t.Errorf("redisConnFromURI(%q) succeeded, want error", uri)
 		}
 	}
@@ -247,7 +245,7 @@ func TestRedisConnFromURIDefaultPort(t *testing.T) {
 	if !strings.Contains(workerSettings.URI, "localhost:6379") {
 		t.Skip("Redis is not on localhost:6379")
 	}
-	conn, err := redisConnFromURI(context.Background(), "redis://localhost/1")
+	conn, err := redisConnFromURI(t.Context(), "redis://localhost/1")
 	if err != nil {
 		t.Fatalf("dialing without a port: %v", err)
 	}

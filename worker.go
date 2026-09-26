@@ -34,7 +34,7 @@ func (w *worker) start(conn *RedisConn, job *Job) error {
 		return err
 	}
 
-	logger.Debug("processing job", "queue", work.Queue, "class", work.Payload.Class, "run_at", work.RunAt)
+	logger().Debug("processing job", "queue", work.Queue, "class", work.Payload.Class, "run_at", work.RunAt)
 
 	return pipeline(conn,
 		command("SET", fmt.Sprintf("%sworker:%s", workerSettings.Namespace, w), buffer),
@@ -65,29 +65,25 @@ func (w *worker) finish(conn *RedisConn, job *Job, err error) error {
 func (w *worker) work(jobs <-chan *Job, monitor *sync.WaitGroup) {
 	conn, err := GetConn()
 	if err != nil {
-		logger.Error("getting connection in worker", "worker", w, "error", err)
+		logger().Error("getting connection in worker", "worker", w, "error", err)
 	} else {
 		if err := w.open(conn); err != nil {
-			logger.Error("registering worker", "worker", w, "error", err)
+			logger().Error("registering worker", "worker", w, "error", err)
 		}
 		PutConn(conn)
 	}
 
 	// Keep consuming jobs even if registration failed so the
 	// poller never blocks on a worker that is not listening.
-	monitor.Add(1)
-
-	go func() {
+	monitor.Go(func() {
 		defer func() {
-			defer monitor.Done()
-
 			conn, err := GetConn()
 			if err != nil {
-				logger.Error("getting connection in worker", "worker", w, "error", err)
+				logger().Error("getting connection in worker", "worker", w, "error", err)
 				return
 			}
 			if err := w.close(conn); err != nil {
-				logger.Error("unregistering worker", "worker", w, "error", err)
+				logger().Error("unregistering worker", "worker", w, "error", err)
 			}
 			PutConn(conn)
 		}()
@@ -95,14 +91,14 @@ func (w *worker) work(jobs <-chan *Job, monitor *sync.WaitGroup) {
 			if workerFunc, ok := workers.Get(job.Payload.Class); ok {
 				w.run(job, workerFunc)
 
-				logger.Debug("done", "queue", job.Queue, "class", job.Payload.Class, "args", job.Payload.Args)
+				logger().Debug("done", "queue", job.Queue, "class", job.Payload.Class, "args", job.Payload.Args)
 			} else {
 				err := fmt.Errorf("no worker for %s in queue %s with args %v", job.Payload.Class, job.Queue, job.Payload.Args)
-				logger.Error("no worker for job", "queue", job.Queue, "class", job.Payload.Class, "args", job.Payload.Args)
+				logger().Error("no worker for job", "queue", job.Queue, "class", job.Payload.Class, "args", job.Payload.Args)
 				w.report(job, err)
 			}
 		}
-	}()
+	})
 }
 
 func (w *worker) run(job *Job, workerFunc workerFunc) {
@@ -110,10 +106,10 @@ func (w *worker) run(job *Job, workerFunc workerFunc) {
 	if err != nil {
 		// Bookkeeping failed, but the job is already off the
 		// queue: run it anyway rather than dropping it.
-		logger.Error("getting connection in worker on start", "worker", w, "error", err)
+		logger().Error("getting connection in worker on start", "worker", w, "error", err)
 	} else {
 		if err := w.start(conn, job); err != nil {
-			logger.Error("recording job start", "worker", w, "error", err)
+			logger().Error("recording job start", "worker", w, "error", err)
 		}
 		PutConn(conn)
 	}
@@ -125,12 +121,12 @@ func (w *worker) run(job *Job, workerFunc workerFunc) {
 func (w *worker) report(job *Job, err error) {
 	conn, errConn := GetConn()
 	if errConn != nil {
-		logger.Error("getting connection in worker on finish", "worker", w, "queue", job.Queue, "class", job.Payload.Class, "job_error", err, "error", errConn)
+		logger().Error("getting connection in worker on finish", "worker", w, "queue", job.Queue, "class", job.Payload.Class, "job_error", err, "error", errConn)
 		return
 	}
 	defer PutConn(conn)
 	if ferr := w.finish(conn, job, err); ferr != nil {
-		logger.Error("recording job result", "worker", w, "queue", job.Queue, "class", job.Payload.Class, "job_error", err, "error", ferr)
+		logger().Error("recording job result", "worker", w, "queue", job.Queue, "class", job.Payload.Class, "job_error", err, "error", ferr)
 	}
 }
 

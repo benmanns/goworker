@@ -8,7 +8,7 @@ called out below.
 
 ### Requirements
 
-- Go 1.22 or later.
+- Go 1.26 or later.
 
 ### Dependencies
 
@@ -18,7 +18,8 @@ called out below.
 
 ### Added
 
-- `SetLogger` to supply a `*slog.Logger`.
+- `SetLogger` to supply a `*slog.Logger`. It is safe to call while
+  workers are running.
 - `rediss://` and `redis://` URIs without a port default to 6379.
 
 ### Changed

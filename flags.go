@@ -95,7 +95,7 @@ func flags() error {
 	}
 
 	if !workerSettings.UseNumber {
-		logger.Warn("deprecation: numbers in job payloads are decoded as float64 and may lose precision; set -use-number to decode them as json.Number and remove this warning")
+		logger().Warn("deprecation: numbers in job payloads are decoded as float64 and may lose precision; set -use-number to decode them as json.Number and remove this warning")
 	}
 
 	return nil
