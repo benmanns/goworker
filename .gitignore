@@ -1,0 +1,7 @@
+# devenv
+.devenv*
+devenv.local.nix
+.direnv
+
+# Redis snapshots from running redis-server in the repo
+dump.rdb

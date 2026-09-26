@@ -2,8 +2,8 @@ package goworker
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
+	"runtime/debug"
 	"sync"
 	"time"
 )
@@ -22,10 +22,6 @@ func newWorker(id string, queues []string) (*worker, error) {
 	}, nil
 }
 
-func (w *worker) MarshalJSON() ([]byte, error) {
-	return json.Marshal(w.String())
-}
-
 func (w *worker) start(conn *RedisConn, job *Job) error {
 	work := &work{
 		Queue:   job.Queue,
@@ -38,118 +34,108 @@ func (w *worker) start(conn *RedisConn, job *Job) error {
 		return err
 	}
 
-	conn.Send("SET", fmt.Sprintf("%sworker:%s", workerSettings.Namespace, w), buffer)
-	logger.Debugf("Processing %s since %s [%v]", work.Queue, work.RunAt, work.Payload.Class)
+	logger().Debug("processing job", "queue", work.Queue, "class", work.Payload.Class, "run_at", work.RunAt)
 
-	return w.process.start(conn)
+	return pipeline(conn,
+		command("SET", fmt.Sprintf("%sworker:%s", workerSettings.Namespace, w), buffer),
+		command("SET", fmt.Sprintf("%sworker:%s:started", workerSettings.Namespace, w), time.Now().Format(startedFormat)),
+	)
 }
 
-func (w *worker) fail(conn *RedisConn, job *Job, err error) error {
-	failure := &failure{
-		FailedAt:  time.Now(),
-		Payload:   job.Payload,
-		Exception: "Error",
-		Error:     err.Error(),
-		Worker:    w,
-		Queue:     job.Queue,
-	}
-	buffer, err := json.Marshal(failure)
-	if err != nil {
-		return err
-	}
-	conn.Send("RPUSH", fmt.Sprintf("%sfailed", workerSettings.Namespace), buffer)
-
-	return w.process.fail(conn)
-}
-
-func (w *worker) succeed(conn *RedisConn, job *Job) error {
-	conn.Send("INCR", fmt.Sprintf("%sstat:processed", workerSettings.Namespace))
-	conn.Send("INCR", fmt.Sprintf("%sstat:processed:%s", workerSettings.Namespace, w))
-
-	return nil
-}
-
+// finish records the outcome of job and clears the worker's
+// entry in a single round trip.
 func (w *worker) finish(conn *RedisConn, job *Job, err error) error {
+	var cmds []redisCommand
 	if err != nil {
-		w.fail(conn, job, err)
+		failed, ferr := failureCommands(w.String(), job, err, nil)
+		if ferr != nil {
+			return ferr
+		}
+		cmds = failed
 	} else {
-		w.succeed(conn, job)
+		cmds = []redisCommand{
+			command("INCR", fmt.Sprintf("%sstat:processed", workerSettings.Namespace)),
+			command("INCR", fmt.Sprintf("%sstat:processed:%s", workerSettings.Namespace, w)),
+		}
 	}
-	return w.process.finish(conn)
+	return pipeline(conn, append(cmds, w.finishCommand())...)
 }
 
 func (w *worker) work(jobs <-chan *Job, monitor *sync.WaitGroup) {
 	conn, err := GetConn()
 	if err != nil {
-		logger.Criticalf("Error on getting connection in worker %v: %v", w, err)
-		return
+		logger().Error("getting connection in worker", "worker", w, "error", err)
 	} else {
-		w.open(conn)
+		if err := w.open(conn); err != nil {
+			logger().Error("registering worker", "worker", w, "error", err)
+		}
 		PutConn(conn)
 	}
 
-	monitor.Add(1)
-
-	go func() {
+	// Keep consuming jobs even if registration failed so the
+	// poller never blocks on a worker that is not listening.
+	monitor.Go(func() {
 		defer func() {
-			defer monitor.Done()
-
 			conn, err := GetConn()
 			if err != nil {
-				logger.Criticalf("Error on getting connection in worker %v: %v", w, err)
+				logger().Error("getting connection in worker", "worker", w, "error", err)
 				return
-			} else {
-				w.close(conn)
-				PutConn(conn)
 			}
+			if err := w.close(conn); err != nil {
+				logger().Error("unregistering worker", "worker", w, "error", err)
+			}
+			PutConn(conn)
 		}()
 		for job := range jobs {
 			if workerFunc, ok := workers.Get(job.Payload.Class); ok {
 				w.run(job, workerFunc)
 
-				logger.Debugf("done: (Job{%s} | %s | %v)", job.Queue, job.Payload.Class, job.Payload.Args)
+				logger().Debug("done", "queue", job.Queue, "class", job.Payload.Class, "args", job.Payload.Args)
 			} else {
-				errorLog := fmt.Sprintf("No worker for %s in queue %s with args %v", job.Payload.Class, job.Queue, job.Payload.Args)
-				logger.Critical(errorLog)
-
-				conn, err := GetConn()
-				if err != nil {
-					logger.Criticalf("Error on getting connection in worker %v: %v", w, err)
-					return
-				} else {
-					w.finish(conn, job, errors.New(errorLog))
-					PutConn(conn)
-				}
+				err := fmt.Errorf("no worker for %s in queue %s with args %v", job.Payload.Class, job.Queue, job.Payload.Args)
+				logger().Error("no worker for job", "queue", job.Queue, "class", job.Payload.Class, "args", job.Payload.Args)
+				w.report(job, err)
 			}
 		}
-	}()
+	})
 }
 
 func (w *worker) run(job *Job, workerFunc workerFunc) {
-	var err error
-	defer func() {
-		conn, errCon := GetConn()
-		if errCon != nil {
-			logger.Criticalf("Error on getting connection in worker on finish %v: %v", w, errCon)
-			return
-		} else {
-			w.finish(conn, job, err)
-			PutConn(conn)
-		}
-	}()
-	defer func() {
-		if r := recover(); r != nil {
-			err = errors.New(fmt.Sprint(r))
-		}
-	}()
-
 	conn, err := GetConn()
 	if err != nil {
-		logger.Criticalf("Error on getting connection in worker on start %v: %v", w, err)
-		return
+		// Bookkeeping failed, but the job is already off the
+		// queue: run it anyway rather than dropping it.
+		logger().Error("getting connection in worker on start", "worker", w, "error", err)
 	} else {
-		w.start(conn, job)
+		if err := w.start(conn, job); err != nil {
+			logger().Error("recording job start", "worker", w, "error", err)
+		}
 		PutConn(conn)
 	}
-	err = workerFunc(job.Queue, job.Payload.Args...)
+
+	w.report(job, call(job, workerFunc))
+}
+
+// report records the outcome of job in Redis.
+func (w *worker) report(job *Job, err error) {
+	conn, errConn := GetConn()
+	if errConn != nil {
+		logger().Error("getting connection in worker on finish", "worker", w, "queue", job.Queue, "class", job.Payload.Class, "job_error", err, "error", errConn)
+		return
+	}
+	defer PutConn(conn)
+	if ferr := w.finish(conn, job, err); ferr != nil {
+		logger().Error("recording job result", "worker", w, "queue", job.Queue, "class", job.Payload.Class, "job_error", err, "error", ferr)
+	}
+}
+
+// call runs workerFunc for job, converting a panic into an
+// error that carries the stack trace.
+func call(job *Job, workerFunc workerFunc) (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = &panicError{value: r, stack: debug.Stack()}
+		}
+	}()
+	return workerFunc(job.Queue, job.Payload.Args...)
 }

@@ -26,14 +26,7 @@ func (wm *workersMutex) Get(class string) (worker workerFunc, ok bool) {
 	return
 }
 
-var workers *workersMutex
-
-func init() {
-	workers = &workersMutex{
-		RWMutex: sync.RWMutex{},
-		workers: make(map[string]workerFunc),
-	}
-}
+var workers = &workersMutex{workers: make(map[string]workerFunc)}
 
 // Register registers a goworker worker function. Class
 // refers to the Ruby name of the class which enqueues the
@@ -43,6 +36,9 @@ func Register(class string, worker workerFunc) {
 	workers.Add(class, worker)
 }
 
+// Enqueue pushes job onto its queue in the same format Resque
+// uses, so it can be processed by goworker or by Ruby Resque
+// workers. It initializes goworker if needed.
 func Enqueue(job *Job) error {
 	err := Init()
 	if err != nil {
@@ -51,28 +47,24 @@ func Enqueue(job *Job) error {
 
 	conn, err := GetConn()
 	if err != nil {
-		logger.Criticalf("Error on getting connection on enqueue")
+		logger().Error("getting connection on enqueue", "error", err)
 		return err
 	}
 	defer PutConn(conn)
 
 	buffer, err := json.Marshal(job.Payload)
 	if err != nil {
-		logger.Criticalf("Cant marshal payload on enqueue")
+		logger().Error("marshaling payload on enqueue", "error", err)
 		return err
 	}
 
-	err = conn.Send("RPUSH", fmt.Sprintf("%squeue:%s", workerSettings.Namespace, job.Queue), buffer)
+	err = pipeline(conn,
+		command("SADD", fmt.Sprintf("%squeues", workerSettings.Namespace), job.Queue),
+		command("RPUSH", fmt.Sprintf("%squeue:%s", workerSettings.Namespace, job.Queue), buffer),
+	)
 	if err != nil {
-		logger.Criticalf("Cant push to queue")
+		logger().Error("pushing to queue", "queue", job.Queue, "error", err)
 		return err
 	}
-
-	err = conn.Send("SADD", fmt.Sprintf("%squeues", workerSettings.Namespace), job.Queue)
-	if err != nil {
-		logger.Criticalf("Cant register queue to list of use queues")
-		return err
-	}
-
-	return conn.Flush()
+	return nil
 }

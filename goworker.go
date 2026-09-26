@@ -1,27 +1,32 @@
 package goworker
 
 import (
+	"context"
+	"errors"
+	"log/slog"
 	"os"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"time"
 
-	"golang.org/x/net/context"
-
-	"github.com/cihub/seelog"
-	"vitess.io/vitess/go/pools"
+	"github.com/gomodule/redigo/redis"
 )
 
 var (
-	logger      seelog.LoggerInterface
-	pool        *pools.ResourcePool
-	ctx         context.Context
+	pool        *redis.Pool
 	initMutex   sync.Mutex
 	initialized bool
 )
 
+var errNotInitialized = errors.New("goworker is not initialized; call Init or Work first")
+
 var workerSettings WorkerSettings
 
+// WorkerSettings configures goworker. Pass it to
+// SetSettings to configure goworker from code instead of
+// with command-line flags. The fields correspond to the
+// flags described in the package documentation.
 type WorkerSettings struct {
 	QueuesString   string
 	Queues         queuesFlag
@@ -38,8 +43,34 @@ type WorkerSettings struct {
 	TLSCertPath    string
 }
 
+// SetSettings replaces goworker's settings. Call it before
+// Init or Work.
 func SetSettings(settings WorkerSettings) {
 	workerSettings = settings
+}
+
+// SetLogger replaces the logger goworker writes to. By
+// default goworker logs at the info level to stdout. It is
+// safe to call at any time; a nil logger restores the default.
+func SetLogger(l *slog.Logger) {
+	if l == nil {
+		l = defaultLogger
+	}
+	currentLogger.Store(l)
+}
+
+var (
+	defaultLogger = slog.New(slog.NewTextHandler(os.Stdout, nil))
+	currentLogger atomic.Pointer[slog.Logger]
+)
+
+// logger returns the logger set with SetLogger, or the
+// default logger. It is safe to call while SetLogger runs.
+func logger() *slog.Logger {
+	if l := currentLogger.Load(); l != nil {
+		return l
+	}
+	return defaultLogger
 }
 
 // Init initializes the goworker process. This will be
@@ -50,16 +81,9 @@ func Init() error {
 	initMutex.Lock()
 	defer initMutex.Unlock()
 	if !initialized {
-		var err error
-		logger, err = seelog.LoggerFromWriterWithMinLevel(os.Stdout, seelog.InfoLvl)
-		if err != nil {
-			return err
-		}
-
 		if err := flags(); err != nil {
 			return err
 		}
-		ctx = context.Background()
 
 		pool = newRedisPool(workerSettings.URI, workerSettings.Connections, workerSettings.Connections, time.Minute)
 
@@ -75,12 +99,14 @@ func Init() error {
 // while they wait for an available connection. Expect this
 // API to change drastically.
 func GetConn() (*RedisConn, error) {
-	resource, err := pool.Get(ctx)
-
+	if pool == nil {
+		return nil, errNotInitialized
+	}
+	conn, err := pool.GetContext(context.Background())
 	if err != nil {
 		return nil, err
 	}
-	return resource.(*RedisConn), nil
+	return &RedisConn{Conn: conn}, nil
 }
 
 // PutConn puts a connection back into the connection pool.
@@ -88,7 +114,7 @@ func GetConn() (*RedisConn, error) {
 // you got from GetConn. Expect this API to change
 // drastically.
 func PutConn(conn *RedisConn) {
-	pool.Put(conn)
+	conn.Close()
 }
 
 // Close cleans up resources initialized by goworker. This
@@ -106,7 +132,9 @@ func Close() {
 	initMutex.Lock()
 	defer initMutex.Unlock()
 	if initialized {
-		pool.Close()
+		if err := pool.Close(); err != nil {
+			logger().Error("closing Redis pool", "error", err)
+		}
 		initialized = false
 	}
 }
@@ -123,28 +151,41 @@ func Work() error {
 	}
 	defer Close()
 
-	quit := signals()
+	if len(workerSettings.Queues) == 0 {
+		return errEmptyQueues
+	}
 
+	quit, stop := signals()
+	defer stop()
+
+	// Create everything before polling starts, so a failure
+	// here cannot leave the poller running.
 	poller, err := newPoller(workerSettings.Queues, workerSettings.IsStrict)
 	if err != nil {
 		return err
 	}
+	ws := make([]*worker, workerSettings.Concurrency)
+	for id := range ws {
+		if ws[id], err = newWorker(strconv.Itoa(id), workerSettings.Queues); err != nil {
+			return err
+		}
+	}
+
 	jobs, err := poller.poll(time.Duration(workerSettings.Interval), quit)
 	if err != nil {
 		return err
 	}
-
 	var monitor sync.WaitGroup
-
-	for id := 0; id < workerSettings.Concurrency; id++ {
-		worker, err := newWorker(strconv.Itoa(id), workerSettings.Queues)
-		if err != nil {
-			return err
-		}
-		worker.work(jobs, &monitor)
+	for _, w := range ws {
+		w.work(jobs, &monitor)
 	}
 
+	// Shut down in order: the poller stops and closes jobs,
+	// each worker finishes its current job and unregisters,
+	// then the poller unregisters, and only then does the
+	// deferred Close shut the connection pool.
 	monitor.Wait()
+	poller.unregister()
 
 	return nil
 }

@@ -1,7 +1,7 @@
 # goworker
 
-![Build](https://github.com/benmanns/goworker/workflows/Go/badge.svg)
-[![GoDoc](https://godoc.org/github.com/benmanns/goworker?status.svg)](https://godoc.org/github.com/benmanns/goworker)
+[![Build](https://github.com/benmanns/goworker/actions/workflows/go.yml/badge.svg)](https://github.com/benmanns/goworker/actions/workflows/go.yml)
+[![Go Reference](https://pkg.go.dev/badge/github.com/benmanns/goworker.svg)](https://pkg.go.dev/github.com/benmanns/goworker)
 
 goworker is a Resque-compatible, Go-based background worker. It allows you to push jobs into a queue using an expressive language like Ruby while harnessing the efficiency and concurrency of Go to minimize job latency and cost.
 
@@ -9,13 +9,13 @@ goworker workers can run alongside Ruby Resque clients so that you can keep all 
 
 ## Installation
 
-To install goworker, use
+goworker requires Go 1.26 or later. To add it to your module, use
 
 ```sh
-go get github.com/benmanns/goworker
+go get github.com/benmanns/goworker@latest
 ```
 
-to install the package, and then from your worker
+and then from your worker
 
 ```go
 import "github.com/benmanns/goworker"
@@ -26,7 +26,7 @@ import "github.com/benmanns/goworker"
 To create a worker, write a function matching the signature
 
 ```go
-func(string, ...interface{}) error
+func(string, ...any) error
 ```
 
 and register it using
@@ -45,7 +45,7 @@ import (
 	"github.com/benmanns/goworker"
 )
 
-func myFunc(queue string, args ...interface{}) error {
+func myFunc(queue string, args ...any) error {
 	fmt.Printf("From %s, %v\n", queue, args)
 	return nil
 }
@@ -71,9 +71,9 @@ import (
 	"github.com/benmanns/goworker"
 )
 
-func newMyFunc(uri string) (func(queue string, args ...interface{}) error) {
+func newMyFunc(uri string) (func(queue string, args ...any) error) {
 	foo := NewFoo(uri)
-	return func(queue string, args ...interface{}) error {
+	return func(queue string, args ...any) error {
 		foo.Bar(args)
 		return nil
 	}
@@ -100,7 +100,7 @@ import (
 	"github.com/benmanns/goworker"
 )
 
-func myFunc(queue string, args ...interface{}) error {
+func myFunc(queue string, args ...any) error {
 	fmt.Printf("From %s, %v\n", queue, args)
 	return nil
 }
@@ -114,7 +114,7 @@ func init() {
 		ExitOnComplete: false,
 		Concurrency:    2,
 		Namespace:      "resque:",
-		Interval:       5.0,
+		IntervalFloat:  5.0,
 	}
 	goworker.SetSettings(settings)
 	goworker.Register("MyClass", myFunc)
@@ -131,7 +131,7 @@ goworker worker functions receive the queue they are serving and a slice of inte
 
 ```go
 // Expecting (int, string, float64)
-func myFunc(queue, args ...interface{}) error {
+func myFunc(queue string, args ...any) error {
 	idNum, ok := args[0].(json.Number)
 	if !ok {
 		return errorInvalidParam
@@ -182,7 +182,7 @@ goworker.Enqueue(&goworker.Job{
     Queue: "myqueue",
     Payload: goworker.Payload{
         Class: "MyClass",
-        Args: []interface{}{"hi", "there"},
+        Args: []any{"hi", "there"},
     },
 })
 ```
@@ -198,12 +198,25 @@ There are several flags which control the operation of the goworker client.
 * `-uri=redis://localhost:6379/` — Specifies the URI of the Redis database from which goworker polls for jobs. Accepts URIs of the format `redis://user:pass@host:port/db` or `unix:///path/to/redis.sock`. The flag may also be set by the environment variable `$($REDIS_PROVIDER)` or `$REDIS_URL`. E.g. set `$REDIS_PROVIDER` to `REDISTOGO_URL` on Heroku to let the Redis To Go add-on configure the Redis database.
 * `-namespace=resque:` — Specifies the namespace from which goworker retrieves jobs and stores stats on workers.
 * `-exit-on-complete=false` — Exits goworker when there are no jobs left in the queue. This is helpful in conjunction with the `time` command to benchmark different configurations.
+* `-use-number=false` — Uses `json.Number` when decoding numbers in the job payloads. This avoids losing precision on large integers, which are otherwise decoded as `float64`.
+* `-tls-cert=""` — Path to a PEM-encoded CA certificate to trust when connecting with a `rediss://` URI.
+* `-insecure-tls=false` — Skips TLS certificate verification for `rediss://` URIs.
 
-You can also configure your own flags for use within your workers. Be sure to set them before calling `goworker.Main()`. It is okay to call `flags.Parse()` before calling `goworker.Main()` if you need to do additional processing on your flags.
+You can also configure your own flags for use within your workers. Be sure to set them before calling `goworker.Work()`. It is okay to call `flag.Parse()` before calling `goworker.Work()` if you need to do additional processing on your flags.
+
+When configuring goworker with `goworker.SetSettings`, any of `IntervalFloat`, `Concurrency`, `Connections`, and `URI` left at zero use the defaults above.
+
+## Logging
+
+goworker logs to standard output using `log/slog`. To send logs elsewhere or change the level, pass your own logger before calling `Init` or `Work`:
+
+```go
+goworker.SetLogger(slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelDebug})))
+```
 
 ## Signal Handling in goworker
 
-To stop goworker, send a `QUIT`, `TERM`, or `INT` signal to the process. This will immediately stop job polling. There can be up to `$CONCURRENCY` jobs currently running, which will continue to run until they are finished.
+To stop goworker, send a `QUIT`, `TERM`, or `INT` signal to the process. This will immediately stop job polling. There can be up to `$CONCURRENCY` jobs currently running, which will continue to run until they are finished. A second signal terminates the process immediately.
 
 ## Failure Modes
 
@@ -218,6 +231,18 @@ resque:worker:<hostname>:<process-id>-<worker-id>:<queues>
 ```
 
 as a JSON object with keys `queue`, `run_at`, and `payload`, but the process is manual. Additionally, there is no guarantee that the job in Redis under the worker key has not finished, if the process is killed before goworker can flush the update to Redis.
+
+## Development
+
+The repository includes a [devenv](https://devenv.sh) environment with Go, golangci-lint, govulncheck, and a Redis server for the integration tests.
+
+```sh
+devenv shell    # enter the environment (or use direnv with the included .envrc)
+devenv up       # start Redis in the foreground
+devenv test     # start Redis, then run gofmt, go vet, and go test -race
+```
+
+Without devenv, any Go 1.26+ toolchain works; tests that need Redis use `$REDIS_URL` (default `redis://localhost:6379/`) and are skipped when it is unreachable.
 
 ## Contributing
 

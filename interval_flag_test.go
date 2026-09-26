@@ -28,10 +28,8 @@ func TestIntervalFlagSet(t *testing.T) {
 		actual := new(intervalFlag)
 		if err := actual.Set(tt.v); err != nil {
 			t.Errorf("IntervalFlag(%#v): set to %s error %s", actual, tt.v, err)
-		} else {
-			if *actual != tt.expected {
-				t.Errorf("IntervalFlag: set to %s expected %v, actual %v", tt.v, tt.expected, actual)
-			}
+		} else if *actual != tt.expected {
+			t.Errorf("IntervalFlag: set to %s expected %v, actual %v", tt.v, tt.expected, actual)
 		}
 	}
 }
@@ -59,10 +57,8 @@ func TestIntervalFlagSetFloat(t *testing.T) {
 		actual := new(intervalFlag)
 		if err := actual.SetFloat(tt.v); err != nil {
 			t.Errorf("IntervalFlag(%#v): set to %f error %s", actual, tt.v, err)
-		} else {
-			if *actual != tt.expected {
-				t.Errorf("IntervalFlag: set to %f expected %v, actual %v", tt.v, tt.expected, actual)
-			}
+		} else if *actual != tt.expected {
+			t.Errorf("IntervalFlag: set to %f expected %v, actual %v", tt.v, tt.expected, actual)
 		}
 	}
 }
