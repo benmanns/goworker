@@ -120,25 +120,10 @@ func (p *poller) poll(interval time.Duration, quit <-chan struct{}) (<-chan *Job
 	jobs := make(chan *Job)
 
 	go func() {
-		defer func() {
-			// Close jobs last: Work returns, and closes the
-			// connection pool, once workers see it closed, so
-			// the poller must unregister itself first.
-			defer close(jobs)
-
-			conn, err := GetConn()
-			if err != nil {
-				logger().Error("getting connection in poller", "poller", p, "error", err)
-				return
-			}
-			defer PutConn(conn)
-			if err := p.finish(conn); err != nil {
-				logger().Error("finishing poller", "poller", p, "error", err)
-			}
-			if err := p.close(conn); err != nil {
-				logger().Error("unregistering poller", "poller", p, "error", err)
-			}
-		}()
+		// Closing jobs tells the workers to finish. The poller
+		// stays registered until Work calls unregister after
+		// they have.
+		defer close(jobs)
 
 		for {
 			select {
@@ -185,6 +170,23 @@ func (p *poller) poll(interval time.Duration, quit <-chan struct{}) (<-chan *Job
 	}()
 
 	return jobs, nil
+}
+
+// unregister removes the poller's entries from Redis. Work
+// calls it after every worker has finished and unregistered.
+func (p *poller) unregister() {
+	conn, err := GetConn()
+	if err != nil {
+		logger().Error("getting connection in poller", "poller", p, "error", err)
+		return
+	}
+	defer PutConn(conn)
+	if err := p.finish(conn); err != nil {
+		logger().Error("finishing poller", "poller", p, "error", err)
+	}
+	if err := p.close(conn); err != nil {
+		logger().Error("unregistering poller", "poller", p, "error", err)
+	}
 }
 
 // sleep waits for d to elapse. It returns false if quit

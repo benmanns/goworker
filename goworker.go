@@ -158,26 +158,34 @@ func Work() error {
 	quit, stop := signals()
 	defer stop()
 
+	// Create everything before polling starts, so a failure
+	// here cannot leave the poller running.
 	poller, err := newPoller(workerSettings.Queues, workerSettings.IsStrict)
 	if err != nil {
 		return err
 	}
+	ws := make([]*worker, workerSettings.Concurrency)
+	for id := range ws {
+		if ws[id], err = newWorker(strconv.Itoa(id), workerSettings.Queues); err != nil {
+			return err
+		}
+	}
+
 	jobs, err := poller.poll(time.Duration(workerSettings.Interval), quit)
 	if err != nil {
 		return err
 	}
-
 	var monitor sync.WaitGroup
-
-	for id := range workerSettings.Concurrency {
-		worker, err := newWorker(strconv.Itoa(id), workerSettings.Queues)
-		if err != nil {
-			return err
-		}
-		worker.work(jobs, &monitor)
+	for _, w := range ws {
+		w.work(jobs, &monitor)
 	}
 
+	// Shut down in order: the poller stops and closes jobs,
+	// each worker finishes its current job and unregisters,
+	// then the poller unregisters, and only then does the
+	// deferred Close shut the connection pool.
 	monitor.Wait()
+	poller.unregister()
 
 	return nil
 }

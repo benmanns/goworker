@@ -308,3 +308,37 @@ func TestSignals(t *testing.T) {
 		t.Fatal("quit not closed after SIGTERM")
 	}
 }
+
+func TestWorkLeavesNoProcessStateInRedis(t *testing.T) {
+	setupRedisTest(t, "q")
+	Register("CleanupOK", func(string, ...any) error { return nil })
+	Register("CleanupFails", func(string, ...any) error { return errors.New("nope") })
+	for _, class := range []string{"CleanupOK", "CleanupFails", "CleanupOK"} {
+		if err := Enqueue(&Job{Queue: "q", Payload: Payload{Class: class}}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := Work(); err != nil {
+		t.Fatal(err)
+	}
+
+	if n, _ := redis.Int(redisDo(t, "SCARD", Namespace()+"workers"), nil); n != 0 {
+		t.Errorf("%d entries left in the workers set", n)
+	}
+	for _, pattern := range []string{"worker:*", "stat:processed:*", "stat:failed:*"} {
+		keys, err := redis.Strings(redisDo(t, "KEYS", Namespace()+pattern), nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(keys) > 0 {
+			t.Errorf("per-process keys left behind: %v", keys)
+		}
+	}
+	// The global counters are not per-process and must survive.
+	if n, _ := redis.Int(redisDo(t, "GET", Namespace()+"stat:processed"), nil); n != 2 {
+		t.Errorf("stat:processed = %d, want 2", n)
+	}
+	if n, _ := redis.Int(redisDo(t, "GET", Namespace()+"stat:failed"), nil); n != 1 {
+		t.Errorf("stat:failed = %d, want 1", n)
+	}
+}
