@@ -234,7 +234,7 @@ as a JSON object with keys `queue`, `run_at`, and `payload`, but the process is 
 
 ## Development
 
-The repository includes a [devenv](https://devenv.sh) environment with Go, golangci-lint, and a Redis server for the integration tests.
+The repository includes a [devenv](https://devenv.sh) environment with Go, golangci-lint, govulncheck, and a Redis server for the integration tests.
 
 ```sh
 devenv shell    # enter the environment (or use direnv with the included .envrc)
@@ -242,7 +242,7 @@ devenv up       # start Redis in the foreground
 devenv test     # start Redis, then run gofmt, go vet, and go test -race
 ```
 
-Inside the shell, `unit`, `lint`, `vulncheck`, and `fmt` run the tests, golangci-lint, govulncheck, and gofmt. Without devenv, any Go 1.22+ toolchain works; tests that need Redis use `$REDIS_URL` (default `redis://localhost:6379/`) and are skipped when it is unreachable.
+Without devenv, any Go 1.22+ toolchain works; tests that need Redis use `$REDIS_URL` (default `redis://localhost:6379/`) and are skipped when it is unreachable.
 
 ## Contributing
 

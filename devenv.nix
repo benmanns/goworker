@@ -20,21 +20,6 @@
 
   env.REDIS_URL = "redis://localhost:6379/";
 
-  scripts = {
-    fmt.exec = ''
-      gofmt -s -w .
-    '';
-    lint.exec = ''
-      golangci-lint run ./...
-    '';
-    vulncheck.exec = ''
-      govulncheck ./...
-    '';
-    unit.exec = ''
-      go test -race -count=1 ./...
-    '';
-  };
-
   enterShell = ''
     go version
   '';

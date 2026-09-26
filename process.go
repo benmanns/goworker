@@ -76,8 +76,10 @@ func (p *process) queues(strict bool) []string {
 	}
 
 	// If not then we want to shuffle the queues before returning them.
+	// The shuffle only spreads polling across weighted queues, so it
+	// does not need a cryptographic source.
 	queues := make([]string, len(p.Queues))
-	for i, v := range rand.Perm(len(p.Queues)) {
+	for i, v := range rand.Perm(len(p.Queues)) { //nolint:gosec,nolintlint // G404: load balancing, not security (older golangci-lint does not flag it)
 		queues[i] = p.Queues[v]
 	}
 	return queues
