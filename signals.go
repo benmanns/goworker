@@ -48,7 +48,9 @@ func signals() <-chan bool {
 	quit := make(chan bool)
 
 	go func() {
-		signals := make(chan os.Signal)
+		// signal.Notify does not block when sending, so the channel must be
+		// buffered or a signal delivered before the receive below is dropped.
+		signals := make(chan os.Signal, 1)
 		defer close(signals)
 
 		signal.Notify(signals, syscall.SIGQUIT, syscall.SIGTERM, os.Interrupt)
